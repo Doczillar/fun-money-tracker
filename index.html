@@ -135,12 +135,51 @@
 
   .gauge-track { stroke: var(--track); }
   .gauge-fill {
-    stroke: var(--gold);
+    stroke: var(--mint);
     stroke-linecap: round;
     transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
   }
+  @keyframes entryIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+  }
+  .entry-row.just-added { animation: entryIn 0.3s ease; }
+  @keyframes amountPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  .gauge-center .amount.pulse { animation: amountPulse 0.45s ease; }
+
+  .float-amount {
+    position: absolute;
+    left: 50%;
+    top: 62%;
+    transform: translateX(-50%);
+    font-weight: 700;
+    font-size: 20px;
+    font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+    pointer-events: none;
+    white-space: nowrap;
+    animation: floatDown 1.1s ease-out forwards;
+  }
+  .float-amount.spent { color: var(--coral); }
+  .float-amount.added { color: var(--mint); }
+  @keyframes floatDown {
+    0% { opacity: 0; transform: translate(-50%, -6px); }
+    15% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 64px); }
+  }
   @media (prefers-reduced-motion: reduce) {
     .gauge-fill { transition: none; }
+    .entry-row.just-added { animation: none; }
+    .gauge-center .amount.pulse { animation: none; }
+    .float-amount { animation: floatFade 1.1s ease-out forwards; }
+  }
+  @keyframes floatFade {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
   }
 
   .gauge-center {
@@ -576,7 +615,7 @@
     fillEl.setAttribute('stroke-dashoffset', offset);
 
     var lowFunds = remaining < budget * 0.2;
-    fillEl.style.stroke = lowFunds ? 'var(--coral)' : 'var(--gold)';
+    fillEl.style.stroke = lowFunds ? 'var(--coral)' : 'var(--mint)';
 
     var amountEl = document.getElementById('remainingAmount');
     amountEl.textContent = fmt(remaining);
@@ -607,7 +646,7 @@
     withBalance.slice().reverse().forEach(function(item) {
       var e = item.entry;
       var row = document.createElement('div');
-      row.className = 'entry-row';
+      row.className = 'entry-row' + (e.id === justAddedId ? ' just-added' : '');
 
       var d = new Date(e.ts);
       var timeStr = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -642,14 +681,26 @@
   }
 
   // --- Entry form ---
-  document.getElementById('typeSpent').addEventListener('click', function() { setType('spent'); });
-  document.getElementById('typeAdded').addEventListener('click', function() { setType('added'); });
+  // Handle the Spent/Added toggle on touchstart/mousedown with preventDefault so
+  // the buttons never take focus - this keeps the keyboard open if the user is
+  // mid-entry in the amount field. Click stays bound for keyboard accessibility
+  // (setType is idempotent, so any double-fire is harmless).
+  function bindTypeButton(id, type) {
+    var el = document.getElementById(id);
+    el.addEventListener('touchstart', function(e) { e.preventDefault(); setType(type); }, { passive: false });
+    el.addEventListener('mousedown', function(e) { e.preventDefault(); setType(type); });
+    el.addEventListener('click', function() { setType(type); });
+  }
+  bindTypeButton('typeSpent', 'spent');
+  bindTypeButton('typeAdded', 'added');
 
   function setType(t) {
     currentType = t;
     document.getElementById('typeSpent').classList.toggle('active', t === 'spent');
     document.getElementById('typeAdded').classList.toggle('active', t === 'added');
   }
+
+  var justAddedId = null;
 
   document.getElementById('addBtn').addEventListener('click', function() {
     var input = document.getElementById('amountInput');
@@ -663,9 +714,10 @@
     errorEl.classList.remove('show');
 
     var note = document.getElementById('noteInput').value.trim();
+    var newId = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
 
     state.entries.push({
-      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      id: newId,
       amount: Math.round(amount * 100) / 100,
       type: currentType,
       note: note,
@@ -676,7 +728,35 @@
     input.value = '';
     document.getElementById('noteInput').value = '';
     setType('spent');
+
+    justAddedId = newId;
     render();
+    justAddedId = null;
+
+    // Pulse the remaining balance as a quick "recorded" cue
+    var amtEl = document.getElementById('remainingAmount');
+    amtEl.classList.remove('pulse');
+    void amtEl.offsetWidth; // restart the animation if it's still mid-run
+    amtEl.classList.add('pulse');
+
+    // Float a signed amount down away from the gauge: coral "−$X.XX" for
+    // spending, mint "+$X.XX" for additions. pointer-events is disabled in
+    // CSS so the page stays fully interactive while it plays.
+    var entryType = state.entries[state.entries.length - 1].type;
+    var entryAmount = state.entries[state.entries.length - 1].amount;
+    var floatEl = document.createElement('div');
+    floatEl.className = 'float-amount ' + entryType + ' num';
+    floatEl.textContent = (entryType === 'added' ? '+' : '\u2212') + '$' + entryAmount.toFixed(2);
+    var wrap = document.querySelector('.gauge-wrap');
+    wrap.appendChild(floatEl);
+    var removed = false;
+    function removeFloat() {
+      if (removed) return;
+      removed = true;
+      if (floatEl.parentNode) floatEl.parentNode.removeChild(floatEl);
+    }
+    floatEl.addEventListener('animationend', removeFloat);
+    setTimeout(removeFloat, 1500); // fallback in case animationend never fires
   });
 
   // --- Settings modal ---
