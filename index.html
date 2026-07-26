@@ -321,6 +321,11 @@
     justify-content: space-between;
     margin-bottom: 8px;
     gap: 10px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .entry-row:active {
+    background: var(--surface-raised);
   }
 
   .entry-left { display: flex; flex-direction: column; min-width: 0; }
@@ -532,6 +537,22 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="editOverlay">
+  <div class="modal">
+    <h3 id="editTitle">Edit entry</h3>
+    <p id="editSubtitle"></p>
+    <label for="editAmount">Amount</label>
+    <input class="amount-input" id="editAmount" type="text" inputmode="decimal" placeholder="$0.00" style="width:100%; margin-bottom:12px">
+    <div class="error-text" id="editError">Enter an amount greater than $0.</div>
+    <label for="editNote">Description</label>
+    <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40" style="margin-bottom:0">
+    <div class="modal-btn-row">
+      <button class="btn btn-secondary" id="editCancel">Cancel</button>
+      <button class="btn btn-primary" id="editSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   var STORAGE_KEY = 'funMoneyApp';
@@ -692,24 +713,17 @@
       return;
     }
 
-    var running = state.budget || 0;
-    var withBalance = state.entries.map(function(e) {
-      running += e.type === 'added' ? e.amount : -e.amount;
-      return { entry: e, balance: running };
-    });
-
-    withBalance.slice().reverse().forEach(function(item) {
-      var e = item.entry;
+    state.entries.slice().reverse().forEach(function(e) {
       var row = document.createElement('div');
       row.className = 'entry-row' + (e.id === justAddedId ? ' just-added' : '');
 
       var d = new Date(e.ts);
-      var timeStr = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      var timeStr = d.toLocaleString('en-US', { month: 'short', day: 'numeric' });
 
       row.innerHTML =
         '<div class="entry-left">' +
           '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
-          '<div class="entry-meta">' + timeStr + ' &middot; balance ' + fmt(item.balance) + '</div>' +
+          '<div class="entry-meta">' + timeStr + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
           '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmt(e.amount).replace('$','$').replace('-','') + '</div>' +
@@ -717,6 +731,11 @@
         '</div>';
 
       list.appendChild(row);
+
+      row.addEventListener('click', function(ev) {
+        if (ev.target.closest('.delete-btn')) return;
+        openEditModal(e.id);
+      });
     });
 
     Array.prototype.forEach.call(list.querySelectorAll('.delete-btn'), function(btn) {
@@ -928,6 +947,60 @@
   });
 
   document.getElementById('startFreshBtn').addEventListener('click', openSettings);
+
+  // --- Edit entry ---
+  var editOverlay = document.getElementById('editOverlay');
+  var editingId = null;
+
+  function openEditModal(id) {
+    var entry = null;
+    state.entries.forEach(function(e) { if (e.id === id) entry = e; });
+    if (!entry) return;
+
+    editingId = id;
+    document.getElementById('editSubtitle').textContent =
+      (entry.type === 'added' ? 'Received' : 'Spent') + ' \u00b7 ' +
+      new Date(entry.ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    var amountEl = document.getElementById('editAmount');
+    amountEl.value = entry.amount.toFixed(2);
+    document.getElementById('editNote').value = entry.note || '';
+    document.getElementById('editError').classList.remove('show');
+    editOverlay.classList.add('show');
+
+    // Focus synchronously within the tap gesture so the keyboard opens,
+    // with the amount pre-selected so typing replaces it outright.
+    amountEl.focus();
+    amountEl.select();
+  }
+
+  function closeEditModal() {
+    editOverlay.classList.remove('show');
+    editingId = null;
+  }
+
+  editOverlay.addEventListener('click', function(ev) {
+    if (ev.target === editOverlay) closeEditModal();
+  });
+
+  document.getElementById('editCancel').addEventListener('click', closeEditModal);
+
+  document.getElementById('editSave').addEventListener('click', function() {
+    var amount = parseAmount(document.getElementById('editAmount').value);
+    if (isNaN(amount) || amount <= 0) {
+      document.getElementById('editError').classList.add('show');
+      return;
+    }
+    var note = document.getElementById('editNote').value.trim();
+    state.entries.forEach(function(e) {
+      if (e.id === editingId) {
+        e.amount = Math.round(amount * 100) / 100;
+        e.note = note;
+      }
+    });
+    save();
+    closeEditModal();
+    render();
+  });
 
   // --- Backup / restore ---
   document.getElementById('exportBtn').addEventListener('click', function() {
