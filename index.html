@@ -1020,6 +1020,14 @@
   });
 
   // --- Init ---
+  // Registers the offline cache. Requires HTTPS (or localhost), so this is a
+  // no-op when the file is opened directly from disk.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('sw.js').catch(function() {});
+    });
+  }
+
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().catch(function() {});
   }
