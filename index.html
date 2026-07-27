@@ -818,6 +818,9 @@
   <div class="modal">
     <h3 id="editTitle">Edit entry</h3>
     <p id="editSubtitle"></p>
+    <label for="editDay" id="editDayLabel">Day</label>
+    <input class="note-input num" id="editDay" type="number" inputmode="numeric" min="1" step="1" style="margin-bottom:12px">
+    <div class="error-text" id="editDayError">Enter a valid day.</div>
     <label for="editAmount">Amount</label>
     <input class="amount-input" id="editAmount" type="text" inputmode="decimal" placeholder="$0.00" style="width:100%; margin-bottom:12px">
     <div class="error-text" id="editError">Enter an amount greater than $0.</div>
@@ -1170,7 +1173,7 @@
       return;
     }
 
-    state.entries.slice().reverse().forEach(function(e) {
+    state.entries.slice().sort(function(a, b) { return b.ts - a.ts; }).forEach(function(e) {
       var row = document.createElement('div');
       var systemRollover = isSystemRolloverEntry(e);
       row.className = 'entry-row' + (e.id === justAddedId ? ' just-added' : '') +
@@ -1584,9 +1587,23 @@
     if (!entry || isSystemRolloverEntry(entry)) return;
 
     editingId = id;
+    var entryDate = new Date(entry.ts);
+    var period = parseMonthKey(state.monthKey);
+    var daysInPeriod = new Date(period.year, period.month, 0).getDate();
+    var periodName = monthKeyName(state.monthKey);
+
     document.getElementById('editSubtitle').textContent =
       (entry.type === 'added' ? 'Received' : 'Spent') + ' \u00b7 ' +
-      new Date(entry.ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      entryDate.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+    var dayEl = document.getElementById('editDay');
+    dayEl.value = entryDate.getDate();
+    dayEl.max = daysInPeriod;
+    document.getElementById('editDayLabel').textContent = 'Day in ' + periodName;
+    var dayError = document.getElementById('editDayError');
+    dayError.textContent = 'Enter a day from 1 to ' + daysInPeriod + '.';
+    dayError.classList.remove('show');
+
     var amountEl = document.getElementById('editAmount');
     amountEl.value = entry.amount.toFixed(2);
     document.getElementById('editNote').value = entry.note || '';
@@ -1611,16 +1628,42 @@
   document.getElementById('editCancel').addEventListener('click', closeEditModal);
 
   document.getElementById('editSave').addEventListener('click', function() {
+    var period = parseMonthKey(state.monthKey);
+    var daysInPeriod = new Date(period.year, period.month, 0).getDate();
+    var day = Number(document.getElementById('editDay').value);
+    var dayIsValid = Number.isFinite(day) && Math.floor(day) === day && day >= 1 && day <= daysInPeriod;
+    var dayError = document.getElementById('editDayError');
+
+    if (!dayIsValid) {
+      dayError.classList.add('show');
+      document.getElementById('editDay').focus();
+      return;
+    }
+    dayError.classList.remove('show');
+
     var amount = parseAmount(document.getElementById('editAmount').value);
     if (isNaN(amount) || amount <= 0) {
       document.getElementById('editError').classList.add('show');
       return;
     }
+    document.getElementById('editError').classList.remove('show');
+
     var note = document.getElementById('editNote').value.trim();
     state.entries.forEach(function(e) {
       if (e.id === editingId) {
+        var originalDate = new Date(e.ts);
+        var updatedDate = new Date(
+          period.year,
+          period.month - 1,
+          day,
+          originalDate.getHours(),
+          originalDate.getMinutes(),
+          originalDate.getSeconds(),
+          originalDate.getMilliseconds()
+        );
         e.amount = Math.round(amount * 100) / 100;
         e.note = note;
+        e.ts = updatedDate.getTime();
       }
     });
     save();
@@ -1689,7 +1732,7 @@
     if (!snap.entries.length) {
       listEl.innerHTML = '<div class="empty-state">No entries were logged in ' + escapeHtml(monthName) + '.</div>';
     } else {
-      snap.entries.slice().reverse().forEach(function(e) {
+      snap.entries.slice().sort(function(a, b) { return b.ts - a.ts; }).forEach(function(e) {
         var row = document.createElement('div');
         row.className = 'entry-row';
         var dateStr = new Date(e.ts).toLocaleString('en-US', { month: 'short', day: 'numeric' });
@@ -1845,7 +1888,7 @@
       });
 
       function hasUnsavedInput() {
-        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editAmount', 'editNote'];
+        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editDay', 'editAmount', 'editNote'];
         return ids.some(function(id) {
           var el = document.getElementById(id);
           return el && el.value && el.value.trim() !== '';
