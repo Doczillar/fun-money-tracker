@@ -79,12 +79,17 @@
     font-weight: 600;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: -8px -8px -8px 0;
+  }
   .gear {
     background: none;
     border: none;
     color: var(--muted);
     padding: 8px;
-    margin: -8px;
     cursor: pointer;
     border-radius: 10px;
     display: flex;
@@ -257,6 +262,25 @@
   .type-toggle button.active[data-type="spent"] { background: var(--coral); color: #1a1210; }
   .type-toggle button.active[data-type="added"] { background: var(--mint); color: #0f1a12; }
 
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    18% { transform: translateX(-6px); }
+    38% { transform: translateX(6px); }
+    58% { transform: translateX(-4px); }
+    78% { transform: translateX(3px); }
+  }
+  @keyframes borderFlash {
+    0%, 100% { border-color: var(--track); }
+    50% { border-color: var(--coral); }
+  }
+  .amount-input.shake {
+    animation: shake 0.36s ease, borderFlash 0.36s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Drop the movement but keep a visible cue */
+    .amount-input.shake { animation: borderFlash 0.6s ease 2; }
+  }
+
   .note-input {
     width: 100%;
     background: var(--surface-raised);
@@ -355,6 +379,89 @@
     padding: 30px 10px;
   }
 
+  /* --- Last month history --- */
+  .history-link {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: 1px solid var(--track);
+    color: var(--muted);
+    border-radius: 14px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 4px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .history-link.show { display: flex; }
+  .history-link:active { color: var(--ink); border-color: var(--muted); }
+  .history-link svg { flex-shrink: 0; }
+
+  .hist-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-right: 40px;
+  }
+  .hist-month { margin: 0; font-size: 18px; }
+  .hist-base { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .hist-balance-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .hist-balance-lbl { font-size: 14px; color: var(--muted); }
+  .hist-bal { font-size: 22px; font-weight: 700; }
+  .hist-rollover {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin: 6px 0 12px;
+  }
+  .hist-pill {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+    background: var(--track);
+    color: var(--muted);
+  }
+  .hist-pill.pos {
+    background: rgba(111, 191, 139, 0.16);
+    color: var(--mint);
+  }
+  .hist-pill.neg {
+    background: rgba(226, 105, 75, 0.16);
+    color: var(--coral);
+  }
+  .hist-chips { display: flex; gap: 8px; margin-bottom: 14px; }
+  .hist-chip {
+    flex: 1;
+    background: var(--surface-raised);
+    border-radius: 12px;
+    padding: 9px 12px;
+  }
+  .hist-chip .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; }
+  .hist-chip .v { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .hist-chip .v.spent { color: var(--coral); }
+  .hist-chip .v.added { color: var(--mint); }
+  .hist-list {
+    max-height: 48vh;
+    overflow-y: auto;
+    margin-bottom: 0;
+  }
+  .hist-list .entry-row {
+    background: var(--surface-raised);
+    cursor: default;
+  }
+  .hist-list .entry-row:active { background: var(--surface-raised); }
+
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -373,11 +480,28 @@
     max-width: 380px;
     border-radius: 20px;
     padding: 24px 20px;
+    position: relative;
     box-shadow: 0 24px 60px rgba(0,0,0,0.45);
     transform: scale(0.96);
     opacity: 0;
     transition: transform 0.18s ease, opacity 0.18s ease;
   }
+  .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-raised);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .modal-close:active { background: var(--track); }
   .modal-overlay.show .modal {
     transform: scale(1);
     opacity: 1;
@@ -386,7 +510,7 @@
     .modal { transition: none; }
   }
 
-  .modal h3 { margin: 0 0 4px; font-size: 18px; }
+  .modal h3 { margin: 0 0 4px; font-size: 18px; padding-right: 40px; }
   .modal p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
 
   .modal label {
@@ -431,6 +555,92 @@
     background: var(--track);
     margin: 18px 0;
   }
+
+  .banner-text {
+    min-width: 0;
+    line-height: 1.35;
+  }
+
+  .banner.undo-ready {
+    border-color: rgba(232, 185, 77, 0.45);
+  }
+
+  .settings-help {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0 0 12px;
+  }
+
+  .period-action {
+    width: 100%;
+  }
+
+  .btn:disabled {
+    opacity: 0.42;
+    cursor: default;
+  }
+
+  .choice-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 14px 0;
+  }
+
+  .choice-card {
+    width: 100%;
+    text-align: left;
+    border: 1px solid var(--track);
+    background: var(--surface-raised);
+    color: var(--ink);
+    border-radius: 14px;
+    padding: 13px 14px;
+    cursor: pointer;
+  }
+
+  .choice-card.selected {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold);
+  }
+
+  .choice-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .choice-detail {
+    display: block;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 3px;
+  }
+
+  .period-summary {
+    background: var(--surface-raised);
+    border-radius: 12px;
+    padding: 11px 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .period-summary strong {
+    color: var(--ink);
+    font-size: 15px;
+  }
+
+  .timing-note {
+    font-size: 12px !important;
+    line-height: 1.45;
+    margin: 12px 0 0 !important;
+  }
+
 </style>
 </head>
 <body>
@@ -441,25 +651,43 @@
       <h1>Fun Money</h1>
       <div class="month"><span id="baseLabel"></span><span id="monthLabel">—</span></div>
     </div>
-    <button class="gear" id="openSettings" aria-label="Settings">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="7.5"/>
-        <circle cx="12" cy="12" r="2.75"/>
-        <line x1="19.5" y1="12" x2="22.5" y2="12"/>
-        <line x1="17.3" y1="17.3" x2="19.42" y2="19.42"/>
-        <line x1="12" y1="19.5" x2="12" y2="22.5"/>
-        <line x1="6.7" y1="17.3" x2="4.58" y2="19.42"/>
-        <line x1="4.5" y1="12" x2="1.5" y2="12"/>
-        <line x1="6.7" y1="6.7" x2="4.58" y2="4.58"/>
-        <line x1="12" y1="4.5" x2="12" y2="1.5"/>
-        <line x1="17.3" y1="6.7" x2="19.42" y2="4.58"/>
-      </svg>
-    </button>
+    <div class="header-actions">
+      <button class="gear" id="openHistoryTop" aria-label="View last month&rsquo;s transactions" style="display:none">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <polyline points="12 7 12 12 15.5 13.5"/>
+        </svg>
+      </button>
+      <button class="gear" id="openSettings" aria-label="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <mask id="gearCenterHole">
+            <rect x="0" y="0" width="24" height="24" fill="white"/>
+            <circle cx="12" cy="12" r="3.9" fill="black"/>
+          </mask>
+          <g mask="url(#gearCenterHole)" fill="currentColor" stroke="currentColor" stroke-width="0.5" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="6.9" stroke="none"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(45 12 12)"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(90 12 12)"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(135 12 12)"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(180 12 12)"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(225 12 12)"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(270 12 12)"/>
+            <polygon points="10.75,3.3 13.25,3.3 13.85,6.6 10.15,6.6" transform="rotate(315 12 12)"/>
+          </g>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <div class="banner" id="newMonthBanner">
-    <span>It's a new month &mdash; start fresh?</span>
-    <button id="startFreshBtn">Start month</button>
+    <span class="banner-text" id="newMonthBannerText">Ready to start the next month?</span>
+    <button id="reviewMonthBtn">Review</button>
+  </div>
+
+  <div class="banner undo-ready" id="undoMonthBanner">
+    <span class="banner-text" id="undoMonthBannerText">New month started.</span>
+    <button id="undoMonthBtn">Undo</button>
   </div>
 
   <div class="balance-card">
@@ -478,40 +706,49 @@
 
   <div class="entry-form">
     <div class="form-row">
-      <input class="amount-input" id="amountInput" type="text" inputmode="decimal" placeholder="$0.00">
+      <input class="amount-input" id="amountInput" type="text" inputmode="decimal" enterkeyhint="done" placeholder="$0.00">
       <div class="type-toggle">
         <button type="button" class="active" data-type="spent" id="typeSpent">Spent</button>
         <button type="button" data-type="added" id="typeAdded">Received</button>
       </div>
     </div>
     <div class="error-text" id="errorText">Enter an amount greater than $0.</div>
-    <input class="note-input" id="noteInput" type="text" placeholder="What for? (optional)" maxlength="40">
+    <input class="note-input" id="noteInput" type="text" enterkeyhint="done" placeholder="What for? (optional)" maxlength="40">
     <button class="add-btn" id="addBtn">Add entry</button>
   </div>
 
   <div class="entries">
     <h2><span>This month</span><span class="entry-totals" id="entryTotals" style="display:none"></span></h2>
     <div id="entriesList"></div>
+    <button class="history-link" id="historyLink">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg>
+      <span id="historyLinkText">View last month&rsquo;s transactions</span>
+    </button>
   </div>
 
 </div>
 
 <div class="modal-overlay" id="settingsOverlay">
   <div class="modal">
+    <button class="modal-close" id="cancelSettings" aria-label="Close settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
     <h3 id="modalTitle">Set your fun money</h3>
     <p id="modalSubtitle">How much can you spend on fun stuff this month?</p>
     <label for="budgetInput">Base fun money per month</label>
     <input class="amount-input" id="budgetInput" type="text" inputmode="decimal" placeholder="$400.00" style="width:100%">
     <div class="modal-btn-row">
-      <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
       <button class="btn btn-primary" id="saveSettings">Save</button>
     </div>
     <div class="divider" id="resetDivider" style="display:none"></div>
     <div id="resetSection" style="display:none">
-      <label>Start new month</label>
-      <div class="modal-btn-row">
-        <button class="btn btn-secondary" id="carryOverBtn">Roll over<br><span class="num" id="carryOverAmount"></span></button>
-        <button class="btn btn-secondary" id="zeroStartBtn">Start fresh<br><span class="num" id="freshStartAmount"></span></button>
+      <label>Budget period</label>
+      <p class="settings-help" id="periodActionHelp"></p>
+      <div class="modal-btn-row" id="closeMonthRow">
+        <button class="btn btn-secondary period-action" id="closeMonthBtn">Close month</button>
+      </div>
+      <div class="modal-btn-row" id="undoMonthSettingsRow" style="display:none">
+        <button class="btn btn-danger period-action" id="undoMonthSettingsBtn">Undo new month</button>
       </div>
     </div>
     <div class="divider"></div>
@@ -528,12 +765,52 @@
 
 <div class="modal-overlay" id="confirmOverlay">
   <div class="modal">
-    <h3>Start new month?</h3>
-    <p id="confirmSubtitle">This clears all of this month's entries.</p>
+    <h3 id="confirmTitle">Close this month?</h3>
+    <p id="confirmSubtitle">Choose how the next month should begin.</p>
+    <div class="period-summary">
+      <span id="closingBalanceLabel">Ending balance</span>
+      <strong class="num" id="closingBalanceAmount">$0.00</strong>
+    </div>
+    <div class="choice-stack" id="monthStartChoices" role="radiogroup" aria-label="Next month starting balance">
+      <button class="choice-card" id="carryOverChoice" type="button" role="radio" aria-checked="false">
+        <span class="choice-title">Carry over balance</span>
+        <span class="choice-detail num" id="carryOverChoiceDetail"></span>
+      </button>
+      <button class="choice-card" id="freshStartChoice" type="button" role="radio" aria-checked="false">
+        <span class="choice-title">Start fresh</span>
+        <span class="choice-detail num" id="freshStartChoiceDetail"></span>
+      </button>
+    </div>
+    <p class="timing-note" id="transitionTimingNote"></p>
     <div class="modal-btn-row">
       <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
-      <button class="btn btn-primary" id="confirmOk">Start month</button>
+      <button class="btn btn-primary" id="confirmOk" disabled>Choose an option</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="historyOverlay">
+  <div class="modal">
+    <button class="modal-close" id="historyClose" aria-label="Close history">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
+    <div class="hist-title-row">
+      <h3 class="hist-month" id="histMonthName">June</h3>
+      <span class="hist-base num" id="histBaseLabel">$400 base</span>
+    </div>
+    <div class="divider" style="margin: 10px 0 12px"></div>
+    <div class="hist-balance-row">
+      <span class="hist-balance-lbl">Ending balance</span>
+      <span class="hist-bal num" id="histBalance">$0.00</span>
+    </div>
+    <div class="hist-rollover" id="histRollover" style="display:none">
+      <span class="hist-pill" id="histPill"></span>
+    </div>
+    <div class="hist-chips">
+      <div class="hist-chip"><div class="k">Spent</div><div class="v spent num" id="histSpent">$0.00</div></div>
+      <div class="hist-chip"><div class="k">Received</div><div class="v added num" id="histReceived">$0.00</div></div>
+    </div>
+    <div class="hist-list" id="histList"></div>
   </div>
 </div>
 
@@ -558,12 +835,35 @@
   var STORAGE_KEY = 'funMoneyApp';
   var CIRCUMFERENCE = 2 * Math.PI * 70;
 
-  var state = load() || { baseBudget: 400, budget: null, monthKey: null, entries: [] };
+  var state = load() || {
+    baseBudget: 400,
+    budget: null,
+    monthKey: null,
+    entries: [],
+    history: [],
+    transitionUndo: null
+  };
 
-  // Migrate older saved data that predates the base amount concept
+  // Migrate and normalize older saved data.
   if (typeof state.baseBudget !== 'number') {
     state.baseBudget = (typeof state.budget === 'number' && state.budget > 0) ? state.budget : 400;
   }
+  if (typeof state.budget !== 'number' && state.budget !== null) state.budget = state.baseBudget;
+  if (!Array.isArray(state.entries)) state.entries = [];
+  if (!Array.isArray(state.history)) state.history = [];
+  state.history = state.history.slice(-1);
+  if (!state.transitionUndo || typeof state.transitionUndo !== 'object') {
+    state.transitionUndo = null;
+  }
+  if (state.transitionUndo &&
+      (state.monthKey !== state.transitionUndo.startedMonthKey || hasUserTransactions())) {
+    state.transitionUndo = null;
+  }
+
+  // The previous build stored a carried balance inside state.budget. Convert
+  // that adjustment into a protected transaction so it appears in the new
+  // month's activity and history without changing the resulting balance.
+  migrateOpeningAdjustment();
 
   var currentType = 'spent';
 
@@ -572,16 +872,8 @@
     return d.getFullYear() + '-' + (d.getMonth() + 1);
   }
 
-  function daysRemainingLabel() {
-    var now = new Date();
-    var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    var remaining = daysInMonth - now.getDate() + 1;
-    var monthName = now.toLocaleString('en-US', { month: 'long' });
-    return remaining + (remaining === 1 ? ' day' : ' days') + ' left in ' + monthName;
-  }
-
   function parseMonthKey(key) {
-    var parts = key.split('-');
+    var parts = String(key).split('-');
     return { year: parseInt(parts[0], 10), month: parseInt(parts[1], 10) };
   }
 
@@ -590,12 +882,147 @@
     return new Date(mk.year, mk.month - 1, 1).toLocaleString('en-US', { month: 'long' });
   }
 
-  function daysSinceMonthEnded(key) {
+  function monthKeyFullName(key) {
     var mk = parseMonthKey(key);
-    var endOfMonth = new Date(mk.year, mk.month, 0);
+    return new Date(mk.year, mk.month - 1, 1).toLocaleString('en-US', {
+      month: 'long', year: 'numeric'
+    });
+  }
+
+  function nextMonthKey(key) {
+    var mk = parseMonthKey(key);
+    var next = new Date(mk.year, mk.month, 1);
+    return next.getFullYear() + '-' + (next.getMonth() + 1);
+  }
+
+  function startOfToday() {
     var now = new Date();
-    var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return Math.round((startOfToday - endOfMonth) / 86400000);
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  function dayDifference(later, earlier) {
+    var a = Date.UTC(later.getFullYear(), later.getMonth(), later.getDate());
+    var b = Date.UTC(earlier.getFullYear(), earlier.getMonth(), earlier.getDate());
+    return Math.round((a - b) / 86400000);
+  }
+
+  function periodStartDate(key) {
+    var mk = parseMonthKey(key);
+    return new Date(mk.year, mk.month - 1, 1);
+  }
+
+  function periodEndDate(key) {
+    var mk = parseMonthKey(key);
+    return new Date(mk.year, mk.month, 0);
+  }
+
+  function periodCloseWindowDate(key) {
+    var end = periodEndDate(key);
+    // Settings allow the user to close the active period during its final
+    // seven calendar days. The option remains available after the period ends
+    // until the user explicitly starts the next budget period.
+    return new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6);
+  }
+
+  function periodPromptWindowDate(key) {
+    var end = periodEndDate(key);
+    // Keep the home-screen reminder quieter: it begins only during the final
+    // three calendar days, then remains visible after the period has ended.
+    return new Date(end.getFullYear(), end.getMonth(), end.getDate() - 2);
+  }
+
+  function canClosePeriod(key) {
+    return !!key && startOfToday() >= periodCloseWindowDate(key);
+  }
+
+  function shouldPromptToClosePeriod(key) {
+    return !!key && startOfToday() >= periodPromptWindowDate(key);
+  }
+
+  function activePeriodStatusLabel() {
+    if (!state.monthKey) return '';
+    var today = startOfToday();
+    var start = periodStartDate(state.monthKey);
+    var end = periodEndDate(state.monthKey);
+    var name = monthKeyName(state.monthKey);
+
+    if (today < start) {
+      var untilStart = dayDifference(start, today);
+      return name + ' starts in ' + untilStart + (untilStart === 1 ? ' day' : ' days');
+    }
+    if (today > end) {
+      var sinceEnd = dayDifference(today, end);
+      return sinceEnd + (sinceEnd === 1 ? ' day' : ' days') + ' since ' + name + ' ended';
+    }
+
+    var remaining = dayDifference(end, today) + 1;
+    return remaining + (remaining === 1 ? ' day' : ' days') + ' left in ' + name;
+  }
+
+  function transitionTimingMessage(sourceKey, targetKey) {
+    var today = startOfToday();
+    var targetStart = periodStartDate(targetKey);
+    var targetEnd = periodEndDate(targetKey);
+    var targetName = monthKeyName(targetKey);
+    var todayLabel = today.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+
+    if (today < targetStart) {
+      return 'Today is ' + todayLabel + '. Starting ' + targetName +
+        ' now means all new transactions will count toward ' + targetName + '.';
+    }
+    if (today <= targetEnd) {
+      var daysLate = dayDifference(today, targetStart);
+      if (daysLate === 0) {
+        return targetName + ' begins today. New transactions will count toward ' + targetName + '.';
+      }
+      return targetName + ' began ' + daysLate + (daysLate === 1 ? ' day' : ' days') +
+        ' ago. New transactions will count toward ' + targetName + '.';
+    }
+    return targetName + ' has already ended. Start it to catch up, then close it separately.';
+  }
+
+  function cloneData(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function isSystemRolloverEntry(entry) {
+    return !!(entry && entry.system === true && entry.kind === 'rollover');
+  }
+
+  function hasUserTransactions() {
+    return state.entries.some(function(entry) { return !isSystemRolloverEntry(entry); });
+  }
+
+  function migrateOpeningAdjustment() {
+    if (typeof state.budget !== 'number' || typeof state.baseBudget !== 'number') return;
+
+    var adjustment = Math.round((state.budget - state.baseBudget) * 100) / 100;
+    var alreadyRecorded = state.entries.some(isSystemRolloverEntry);
+    if (Math.abs(adjustment) >= 0.005 && !alreadyRecorded && state.monthKey) {
+      var sourceKey = state.transitionUndo && state.transitionUndo.sourceMonthKey;
+      var sourceName = sourceKey ? monthKeyName(sourceKey) : 'last month';
+      state.entries.unshift({
+        id: 'rollover-' + state.monthKey + '-' + Date.now(),
+        amount: Math.abs(adjustment),
+        type: adjustment > 0 ? 'added' : 'spent',
+        note: (adjustment > 0 ? 'Surplus' : 'Deficit') + ' carried over from ' + sourceName,
+        ts: periodStartDate(state.monthKey).getTime(),
+        system: true,
+        kind: 'rollover'
+      });
+      state.budget = state.baseBudget;
+      save();
+    } else if (alreadyRecorded && Math.abs(adjustment) >= 0.005) {
+      state.budget = state.baseBudget;
+      save();
+    }
+  }
+
+  function canUndoTransition() {
+    return !!(state.transitionUndo &&
+      state.transitionUndo.previous &&
+      state.monthKey === state.transitionUndo.startedMonthKey &&
+      !hasUserTransactions());
   }
 
   function load() {
@@ -639,34 +1066,64 @@
   }
 
   function render() {
-    var newMonth = state.monthKey && state.monthKey !== currentMonthKey();
     var monthLabelEl = document.getElementById('monthLabel');
-    if (newMonth) {
-      var daysSince = daysSinceMonthEnded(state.monthKey);
-      monthLabelEl.textContent = daysSince + (daysSince === 1 ? ' day' : ' days') + ' since ' + monthKeyName(state.monthKey) + ' ended';
-      monthLabelEl.classList.add('overdue');
-    } else {
-      monthLabelEl.textContent = daysRemainingLabel();
-      monthLabelEl.classList.remove('overdue');
+    var today = startOfToday();
+    var periodEnd = state.monthKey ? periodEndDate(state.monthKey) : today;
+    var isOverdue = state.monthKey && today > periodEnd;
+    monthLabelEl.textContent = activePeriodStatusLabel();
+    monthLabelEl.classList.toggle('overdue', !!isOverdue);
+
+    var undoReady = canUndoTransition();
+    var canReviewTransition = state.budget !== null && shouldPromptToClosePeriod(state.monthKey);
+    var newMonthBanner = document.getElementById('newMonthBanner');
+    var undoMonthBanner = document.getElementById('undoMonthBanner');
+    newMonthBanner.classList.toggle('show', !!canReviewTransition);
+    undoMonthBanner.classList.toggle('show', !!undoReady);
+
+    if (canReviewTransition) {
+      var sourceName = monthKeyName(state.monthKey);
+      var targetName = monthKeyName(nextMonthKey(state.monthKey));
+      document.getElementById('newMonthBannerText').textContent = isOverdue
+        ? sourceName + ' is ready to close.'
+        : 'Ready to start ' + targetName + '?';
+    }
+    if (undoReady) {
+      var undoTarget = monthKeyName(state.monthKey);
+      document.getElementById('undoMonthBannerText').textContent =
+        undoTarget + ' started. You can undo until you add its first transaction.';
     }
 
-    document.getElementById('newMonthBanner').classList.toggle('show', !!newMonth);
+    var histLink = document.getElementById('historyLink');
+    var histTopBtn = document.getElementById('openHistoryTop');
+    if (state.history.length) {
+      var lastArchived = state.history[state.history.length - 1];
+      var archivedName = monthKeyName(lastArchived.monthKey);
+      document.getElementById('historyLinkText').innerHTML =
+        'View ' + escapeHtml(archivedName) + '&rsquo;s transactions';
+      histLink.classList.add('show');
+      histTopBtn.setAttribute('aria-label', 'View ' + archivedName + '\u2019s transactions');
+      histTopBtn.style.display = 'flex';
+    } else {
+      histLink.classList.remove('show');
+      histTopBtn.style.display = 'none';
+    }
 
     document.getElementById('baseLabel').textContent =
       state.baseBudget ? fmtCompact(state.baseBudget) + '/mo \u00b7 ' : '';
 
     var budget = state.budget || 0;
     var remaining = computeRemaining();
-    var ratio = budget > 0 ? Math.max(0, Math.min(1, remaining / budget)) : 0;
+    var gaugeMax = Math.max(state.baseBudget || 0, budget, 0.01);
+    var ratio = Math.max(0, Math.min(1, remaining / gaugeMax));
     var offset = CIRCUMFERENCE * (1 - ratio);
 
     var fillEl = document.getElementById('gaugeFill');
     fillEl.setAttribute('stroke-dashoffset', offset);
 
     var gaugeColor;
-    if (remaining < budget * 0.2) {
+    if (remaining < (state.baseBudget || budget) * 0.2) {
       gaugeColor = 'var(--coral)';
-    } else if (remaining < budget / 3) {
+    } else if (remaining < (state.baseBudget || budget) / 3) {
       gaugeColor = 'var(--gold)';
     } else {
       gaugeColor = 'var(--mint)';
@@ -715,7 +1172,9 @@
 
     state.entries.slice().reverse().forEach(function(e) {
       var row = document.createElement('div');
-      row.className = 'entry-row' + (e.id === justAddedId ? ' just-added' : '');
+      var systemRollover = isSystemRolloverEntry(e);
+      row.className = 'entry-row' + (e.id === justAddedId ? ' just-added' : '') +
+        (systemRollover ? ' system-entry' : '');
 
       var d = new Date(e.ts);
       var timeStr = d.toLocaleString('en-US', { month: 'short', day: 'numeric' });
@@ -723,25 +1182,29 @@
       row.innerHTML =
         '<div class="entry-left">' +
           '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
-          '<div class="entry-meta">' + timeStr + '</div>' +
+          '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
           '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmt(e.amount).replace('$','$').replace('-','') + '</div>' +
-          '<button class="delete-btn" data-id="' + e.id + '" aria-label="Delete entry">&times;</button>' +
+          (systemRollover ? '' : '<button class="delete-btn" data-id="' + e.id + '" aria-label="Delete entry">&times;</button>') +
         '</div>';
 
       list.appendChild(row);
 
-      row.addEventListener('click', function(ev) {
-        if (ev.target.closest('.delete-btn')) return;
-        openEditModal(e.id);
-      });
+      if (!systemRollover) {
+        row.addEventListener('click', function(ev) {
+          if (ev.target.closest('.delete-btn')) return;
+          openEditModal(e.id);
+        });
+      }
     });
 
     Array.prototype.forEach.call(list.querySelectorAll('.delete-btn'), function(btn) {
       btn.addEventListener('click', function() {
         var id = btn.getAttribute('data-id');
-        state.entries = state.entries.filter(function(e) { return e.id !== id; });
+        state.entries = state.entries.filter(function(e) {
+          return e.id !== id || isSystemRolloverEntry(e);
+        });
         save();
         render();
       });
@@ -776,19 +1239,33 @@
 
   var justAddedId = null;
 
-  document.getElementById('addBtn').addEventListener('click', function() {
+  function flagEmptyAmount() {
+    var input = document.getElementById('amountInput');
+    document.getElementById('errorText').classList.add('show');
+    input.classList.remove('shake');
+    void input.offsetWidth; // restart the animation if it's still mid-run
+    input.classList.add('shake');
+    input.focus();
+  }
+
+  function addEntry(fromKeyboard) {
     var input = document.getElementById('amountInput');
     var amount = parseAmount(input.value);
     var errorEl = document.getElementById('errorText');
 
     if (isNaN(amount) || amount <= 0) {
-      errorEl.classList.add('show');
+      flagEmptyAmount();
       return;
     }
     errorEl.classList.remove('show');
+    input.classList.remove('shake');
 
     var note = document.getElementById('noteInput').value.trim();
     var newId = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+
+    // The first real transaction locks the month transition. Deleting that
+    // transaction later does not restore the undo option.
+    if (canUndoTransition()) state.transitionUndo = null;
 
     state.entries.push({
       id: newId,
@@ -831,10 +1308,74 @@
     }
     floatEl.addEventListener('animationend', removeFloat);
     setTimeout(removeFloat, 1500); // fallback in case animationend never fires
+
+    // Submitting via the keyboard means the user is likely entering several in
+    // a row, so keep focus (and the keyboard) on the amount field. Tapping the
+    // button leaves focus alone so the keyboard doesn't pop up unexpectedly.
+    if (fromKeyboard) input.focus();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', function() {
+    addEntry(false);
   });
 
-  // --- Settings modal ---
+  // Enter/Return from either field submits, so the user never has to reach for
+  // the button mid-typing.
+  ['amountInput', 'noteInput'].forEach(function(id) {
+    document.getElementById(id).addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        addEntry(true);
+      }
+    });
+  });
+
+  // --- Settings and month transition ---
   var overlay = document.getElementById('settingsOverlay');
+  var confirmOverlay = document.getElementById('confirmOverlay');
+  var pendingRollOver = null;
+  var pendingSourceMonthKey = null;
+
+  function updatePeriodSettings() {
+    var help = document.getElementById('periodActionHelp');
+    var closeRow = document.getElementById('closeMonthRow');
+    var undoRow = document.getElementById('undoMonthSettingsRow');
+    var closeBtn = document.getElementById('closeMonthBtn');
+    var undoBtn = document.getElementById('undoMonthSettingsBtn');
+
+    var undoReady = canUndoTransition();
+    var targetKey = nextMonthKey(state.monthKey);
+    var allowed = canClosePeriod(state.monthKey);
+
+    undoRow.style.display = undoReady ? 'flex' : 'none';
+    if (undoReady) {
+      undoBtn.textContent = 'Undo starting ' + monthKeyName(state.monthKey);
+    }
+
+    closeRow.style.display = (!undoReady || allowed) ? 'flex' : 'none';
+    closeBtn.textContent = 'Close ' + monthKeyName(state.monthKey) +
+      ' and start ' + monthKeyName(targetKey);
+    closeBtn.disabled = !allowed;
+
+    if (undoReady && allowed) {
+      help.textContent = 'You can still restore ' + monthKeyName(state.transitionUndo.sourceMonthKey) +
+        ', or close ' + monthKeyName(state.monthKey) + ' to continue. Closing it commits the earlier change.';
+    } else if (undoReady) {
+      help.textContent = 'No new transactions have been added yet, so you can restore ' +
+        monthKeyName(state.transitionUndo.sourceMonthKey) + '.';
+    } else if (allowed) {
+      var overdue = startOfToday() > periodEndDate(state.monthKey);
+      help.textContent = overdue
+        ? monthKeyName(state.monthKey) + ' has ended. Choose whether its ending balance carries forward.'
+        : 'Available now. New transactions will count toward ' + monthKeyName(targetKey) + '.';
+    } else {
+      var available = periodCloseWindowDate(state.monthKey).toLocaleString('en-US', {
+        month: 'long', day: 'numeric'
+      });
+      help.textContent = 'Available ' + available + ', during the final 7 days of ' +
+        monthKeyName(state.monthKey) + '.';
+    }
+  }
 
   function openSettings() {
     var isFirstRun = state.budget === null;
@@ -845,13 +1386,8 @@
     document.getElementById('budgetInput').value = state.baseBudget ? state.baseBudget.toFixed(2) : '';
     document.getElementById('resetDivider').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('resetSection').style.display = isFirstRun ? 'none' : 'block';
-    document.getElementById('cancelSettings').style.display = isFirstRun ? 'none' : 'block';
-    if (!isFirstRun) {
-      var currentRemaining = computeRemaining();
-      var deltaSign = currentRemaining < 0 ? '\u2212' : '+';
-      document.getElementById('carryOverAmount').textContent = deltaSign + '$' + Math.abs(currentRemaining).toFixed(2);
-      document.getElementById('freshStartAmount').textContent = fmt(state.baseBudget);
-    }
+    document.getElementById('cancelSettings').style.display = isFirstRun ? 'none' : 'flex';
+    if (!isFirstRun) updatePeriodSettings();
     overlay.classList.add('show');
   }
 
@@ -869,41 +1405,92 @@
   document.getElementById('saveSettings').addEventListener('click', function() {
     var val = parseAmount(document.getElementById('budgetInput').value);
     if (isNaN(val) || val <= 0) return;
-    state.baseBudget = Math.round(val * 100) / 100;
-    state.budget = state.baseBudget;
+
+    var newBase = Math.round(val * 100) / 100;
+    state.budget = newBase;
+    state.baseBudget = newBase;
     state.monthKey = state.monthKey || currentMonthKey();
     save();
     closeSettings();
     render();
   });
 
-  // --- New month confirmation ---
-  var confirmOverlay = document.getElementById('confirmOverlay');
-  var pendingRollOver = null;
-
-  function askStartNewMonth(rollOver) {
+  function selectMonthStart(rollOver) {
     pendingRollOver = rollOver;
-    var base = state.baseBudget;
-    var msg;
-    if (rollOver) {
-      var leftover = computeRemaining();
-      if (leftover > 0) {
-        msg = 'Rolls over this month\u2019s surplus of ' + fmt(leftover) + ' into the new month. Last month\u2019s entries are cleared.';
-      } else if (leftover < 0) {
-        msg = 'Rolls over this month\u2019s deficit of ' + fmt(Math.abs(leftover)) + ' into the new month. Last month\u2019s entries are cleared.';
-      } else {
-        msg = 'No surplus or deficit to roll over \u2014 starts the new month at the base amount, ' + fmt(base) + '. Last month\u2019s entries are cleared.';
-      }
-    } else {
-      msg = 'Starts the new month fresh at the base amount, ' + fmt(base) + '. Last month\u2019s entries are cleared.';
-    }
-    document.getElementById('confirmSubtitle').textContent = msg;
+    var carryChoice = document.getElementById('carryOverChoice');
+    var freshChoice = document.getElementById('freshStartChoice');
+    carryChoice.classList.toggle('selected', rollOver === true);
+    freshChoice.classList.toggle('selected', rollOver === false);
+    carryChoice.setAttribute('aria-checked', rollOver === true ? 'true' : 'false');
+    freshChoice.setAttribute('aria-checked', rollOver === false ? 'true' : 'false');
+
+    var targetName = monthKeyName(nextMonthKey(pendingSourceMonthKey));
+    var leftover = computeRemaining();
+    var startingBalance = state.baseBudget + (rollOver ? leftover : 0);
+    var confirmBtn = document.getElementById('confirmOk');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Start ' + targetName + ' at ' + fmt(startingBalance);
+  }
+
+  function askStartNewMonth() {
+    if (!state.monthKey || !canClosePeriod(state.monthKey)) return;
+
+    pendingSourceMonthKey = state.monthKey;
+    pendingRollOver = null;
+    var targetKey = nextMonthKey(state.monthKey);
+    var sourceName = monthKeyName(state.monthKey);
+    var targetName = monthKeyName(targetKey);
+    var leftover = computeRemaining();
+    var carryStart = Math.round((state.baseBudget + leftover) * 100) / 100;
+
+    document.getElementById('confirmTitle').textContent =
+      'Close ' + sourceName + ' and start ' + targetName + '?';
+    document.getElementById('confirmSubtitle').textContent =
+      'Choose how ' + targetName + ' should begin.';
+    document.getElementById('closingBalanceLabel').textContent = sourceName + ' ending balance';
+    document.getElementById('closingBalanceAmount').textContent = fmt(leftover);
+    document.getElementById('carryOverChoiceDetail').textContent =
+      targetName + ' starts at ' + fmt(carryStart);
+    document.getElementById('freshStartChoiceDetail').textContent =
+      targetName + ' starts at ' + fmt(state.baseBudget);
+    document.getElementById('transitionTimingNote').textContent =
+      transitionTimingMessage(state.monthKey, targetKey);
+
+    var carryChoice = document.getElementById('carryOverChoice');
+    var freshChoice = document.getElementById('freshStartChoice');
+    carryChoice.classList.remove('selected');
+    freshChoice.classList.remove('selected');
+    carryChoice.setAttribute('aria-checked', 'false');
+    freshChoice.setAttribute('aria-checked', 'false');
+    carryChoice.style.display = Math.abs(leftover) < 0.005 ? 'none' : 'block';
+
+    var confirmBtn = document.getElementById('confirmOk');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Choose an option';
+
+    if (Math.abs(leftover) < 0.005) selectMonthStart(false);
     confirmOverlay.classList.add('show');
   }
 
   function closeConfirm() {
     confirmOverlay.classList.remove('show');
     pendingRollOver = null;
+    pendingSourceMonthKey = null;
+  }
+
+  function undoMonthTransition() {
+    if (!canUndoTransition()) return;
+    var previous = state.transitionUndo.previous;
+    var priorAdjustment = previous.budget - previous.baseBudget;
+
+    state.monthKey = previous.monthKey;
+    state.budget = Math.round((state.baseBudget + priorAdjustment) * 100) / 100;
+    state.entries = cloneData(previous.entries || []);
+    state.history = cloneData(previous.history || []).slice(-1);
+    state.transitionUndo = null;
+    save();
+    closeSettings();
+    render();
   }
 
   confirmOverlay.addEventListener('click', function(e) {
@@ -911,42 +1498,81 @@
   });
 
   document.getElementById('confirmCancel').addEventListener('click', closeConfirm);
+  document.getElementById('carryOverChoice').addEventListener('click', function() {
+    selectMonthStart(true);
+  });
+  document.getElementById('freshStartChoice').addEventListener('click', function() {
+    selectMonthStart(false);
+  });
 
   document.getElementById('confirmOk').addEventListener('click', function() {
-    var rollOver = pendingRollOver;
-    var leftover = computeRemaining();
-    var lastMonthName = state.monthKey ? monthKeyName(state.monthKey) : 'last month';
+    if (pendingRollOver === null || !pendingSourceMonthKey) return;
+    if (state.monthKey !== pendingSourceMonthKey || !canClosePeriod(state.monthKey)) {
+      closeConfirm();
+      render();
+      return;
+    }
 
+    var sourceKey = state.monthKey;
+    var targetKey = nextMonthKey(sourceKey);
+    var leftover = computeRemaining();
+    var rollOver = pendingRollOver;
+    var previousState = {
+      monthKey: state.monthKey,
+      baseBudget: state.baseBudget,
+      budget: state.budget,
+      entries: cloneData(state.entries),
+      history: cloneData(state.history)
+    };
+
+    state.history = [{
+      monthKey: sourceKey,
+      baseBudget: state.baseBudget,
+      openingBalance: state.budget,
+      budget: state.budget,
+      endBalance: Math.round(leftover * 100) / 100,
+      rolledOver: !!rollOver,
+      closedAt: Date.now(),
+      nextMonthKey: targetKey,
+      entries: cloneData(state.entries)
+    }];
+
+    state.monthKey = targetKey;
     state.budget = state.baseBudget;
     state.entries = [];
-    state.monthKey = currentMonthKey();
 
     if (rollOver && Math.abs(leftover) >= 0.005) {
       state.entries.push({
-        id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        id: 'rollover-' + targetKey + '-' + Date.now(),
         amount: Math.round(Math.abs(leftover) * 100) / 100,
         type: leftover > 0 ? 'added' : 'spent',
-        note: (leftover > 0 ? 'Surplus' : 'Deficit') + ' rolled over from ' + lastMonthName,
-        ts: Date.now()
+        note: (leftover > 0 ? 'Surplus' : 'Deficit') + ' carried over from ' + monthKeyName(sourceKey),
+        ts: periodStartDate(targetKey).getTime(),
+        system: true,
+        kind: 'rollover'
       });
     }
+
+    state.transitionUndo = {
+      sourceMonthKey: sourceKey,
+      startedMonthKey: targetKey,
+      rolledOver: !!rollOver,
+      startedAt: Date.now(),
+      previous: previousState
+    };
 
     save();
     closeConfirm();
     render();
   });
 
-  document.getElementById('carryOverBtn').addEventListener('click', function() {
+  document.getElementById('closeMonthBtn').addEventListener('click', function() {
     closeSettings();
-    askStartNewMonth(true);
+    askStartNewMonth();
   });
-
-  document.getElementById('zeroStartBtn').addEventListener('click', function() {
-    closeSettings();
-    askStartNewMonth(false);
-  });
-
-  document.getElementById('startFreshBtn').addEventListener('click', openSettings);
+  document.getElementById('reviewMonthBtn').addEventListener('click', askStartNewMonth);
+  document.getElementById('undoMonthBtn').addEventListener('click', undoMonthTransition);
+  document.getElementById('undoMonthSettingsBtn').addEventListener('click', undoMonthTransition);
 
   // --- Edit entry ---
   var editOverlay = document.getElementById('editOverlay');
@@ -955,7 +1581,7 @@
   function openEditModal(id) {
     var entry = null;
     state.entries.forEach(function(e) { if (e.id === id) entry = e; });
-    if (!entry) return;
+    if (!entry || isSystemRolloverEntry(entry)) return;
 
     editingId = id;
     document.getElementById('editSubtitle').textContent =
@@ -1000,6 +1626,97 @@
     save();
     closeEditModal();
     render();
+  });
+
+  // --- Last month history ---
+  var historyOverlay = document.getElementById('historyOverlay');
+
+  function openHistoryModal() {
+    var snap = state.history[state.history.length - 1];
+    if (!snap) return;
+
+    var monthName = monthKeyName(snap.monthKey);
+    var budget = snap.budget || 0;
+    var bal = snap.endBalance;
+
+    // Ending balance is strictly two-state here: green for positive, red for
+    // negative. The live gauge's three-stage warning colors don't apply to a
+    // closed month.
+    var color = bal < 0 ? 'var(--coral)' : 'var(--mint)';
+
+    document.getElementById('histMonthName').textContent = monthName;
+    document.getElementById('histBaseLabel').textContent = fmtCompact(typeof snap.openingBalance === 'number' ? snap.openingBalance : budget) + ' start';
+    var balEl = document.getElementById('histBalance');
+    balEl.textContent = (bal < 0 ? '\u2212' : '+') + '$' + Math.abs(bal).toFixed(2);
+    balEl.style.color = color;
+
+    var rollEl = document.getElementById('histRollover');
+    if (typeof snap.rolledOver === 'boolean') {
+      var mk = parseMonthKey(snap.monthKey);
+      var nextName = new Date(mk.year, mk.month, 1).toLocaleString('en-US', { month: 'long' });
+
+      // Tinted to match the balance only when something was actually carried.
+      // The "stayed" state stays muted so colour alone signals the rollover.
+      var pillEl = document.getElementById('histPill');
+      pillEl.classList.remove('pos', 'neg');
+      if (Math.abs(bal) < 0.005) {
+        pillEl.textContent = 'Nothing to carry';
+      } else {
+        var subject = bal > 0 ? 'Surplus' : 'Deficit';
+        if (snap.rolledOver) {
+          pillEl.textContent = subject + ' carried to ' + nextName;
+          pillEl.classList.add(bal > 0 ? 'pos' : 'neg');
+        } else {
+          pillEl.textContent = subject + ' stayed in ' + monthName;
+        }
+      }
+
+      rollEl.style.display = 'flex';
+    } else {
+      rollEl.style.display = 'none';
+    }
+
+    var spent = 0, received = 0;
+    snap.entries.forEach(function(e) {
+      if (e.type === 'added') received += e.amount;
+      else spent += e.amount;
+    });
+    document.getElementById('histSpent').textContent = fmt(spent);
+    document.getElementById('histReceived').textContent = fmt(received);
+
+    var listEl = document.getElementById('histList');
+    listEl.innerHTML = '';
+    if (!snap.entries.length) {
+      listEl.innerHTML = '<div class="empty-state">No entries were logged in ' + escapeHtml(monthName) + '.</div>';
+    } else {
+      snap.entries.slice().reverse().forEach(function(e) {
+        var row = document.createElement('div');
+        row.className = 'entry-row';
+        var dateStr = new Date(e.ts).toLocaleString('en-US', { month: 'short', day: 'numeric' });
+        row.innerHTML =
+          '<div class="entry-left">' +
+            '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
+            '<div class="entry-meta">' + dateStr + '</div>' +
+          '</div>' +
+          '<div class="entry-right">' +
+            '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmt(e.amount).replace('-','') + '</div>' +
+          '</div>';
+        listEl.appendChild(row);
+      });
+    }
+
+    historyOverlay.classList.add('show');
+  }
+
+  function closeHistoryModal() {
+    historyOverlay.classList.remove('show');
+  }
+
+  document.getElementById('historyLink').addEventListener('click', openHistoryModal);
+  document.getElementById('openHistoryTop').addEventListener('click', openHistoryModal);
+  document.getElementById('historyClose').addEventListener('click', closeHistoryModal);
+  historyOverlay.addEventListener('click', function(ev) {
+    if (ev.target === historyOverlay) closeHistoryModal();
   });
 
   // --- Backup / restore ---
@@ -1048,6 +1765,17 @@
       }
       if (!confirm('Replace all current data with this backup? This can\u2019t be undone.')) return;
       state = parsed;
+      if (!Array.isArray(state.entries)) state.entries = [];
+      if (!Array.isArray(state.history)) state.history = [];
+      state.history = state.history.slice(-1);
+      if (!state.transitionUndo || typeof state.transitionUndo !== 'object') {
+        state.transitionUndo = null;
+      }
+      migrateOpeningAdjustment();
+      if (state.transitionUndo &&
+          (state.monthKey !== state.transitionUndo.startedMonthKey || hasUserTransactions())) {
+        state.transitionUndo = null;
+      }
       save();
       closeSettings();
       render();
@@ -1071,7 +1799,9 @@
   });
 
   // --- Keep the focused field visible above the keyboard ---
-  var keyboardAwareFields = [document.getElementById('amountInput'), document.getElementById('noteInput')];
+  // Amount field only. The note field intentionally doesn't scroll - doing so
+  // caused unwanted jumps.
+  var keyboardAwareFields = [document.getElementById('amountInput')];
 
   function scrollFieldIntoView(el) {
     el.scrollIntoView({ behavior: 'auto', block: 'center' });
