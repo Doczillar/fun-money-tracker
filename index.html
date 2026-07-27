@@ -927,8 +927,8 @@
   function periodPromptWindowDate(key) {
     var end = periodEndDate(key);
     // Keep the home-screen reminder quieter: it begins only during the final
-    // three calendar days, then remains visible after the period has ended.
-    return new Date(end.getFullYear(), end.getMonth(), end.getDate() - 2);
+    // two calendar days, then remains visible after the period has ended.
+    return new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1);
   }
 
   function canClosePeriod(key) {
@@ -1827,12 +1827,81 @@
   });
 
   // --- Init ---
-  // Registers the offline cache. Requires HTTPS (or localhost), so this is a
-  // no-op when the file is opened directly from disk.
+  // Keep the app current without interrupting active input. Routine HTML
+  // updates are served network-first by sw.js. If the worker itself changes,
+  // activate and reload it only while this launch is still untouched.
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js').catch(function() {});
-    });
+    (function() {
+      var userInteracted = false;
+      var reloadStarted = false;
+      var hadControllerAtLaunch = !!navigator.serviceWorker.controller;
+
+      function markInteraction() {
+        userInteracted = true;
+      }
+
+      ['pointerdown', 'keydown', 'input', 'change', 'submit'].forEach(function(type) {
+        document.addEventListener(type, markInteraction, { capture: true, once: true });
+      });
+
+      function hasUnsavedInput() {
+        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editAmount', 'editNote'];
+        return ids.some(function(id) {
+          var el = document.getElementById(id);
+          return el && el.value && el.value.trim() !== '';
+        });
+      }
+
+      function canApplyUpdateNow() {
+        return !userInteracted &&
+          !hasUnsavedInput() &&
+          document.visibilityState === 'visible';
+      }
+
+      function activateWaitingWorker(registration) {
+        if (!registration.waiting || !canApplyUpdateNow()) return;
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        // Claiming the page on its first-ever service-worker install does not
+        // require a reload. Reload only when replacing an existing worker.
+        if (!hadControllerAtLaunch) {
+          hadControllerAtLaunch = true;
+          return;
+        }
+        if (reloadStarted || !canApplyUpdateNow()) return;
+
+        reloadStarted = true;
+        window.location.reload();
+      });
+
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js', {
+          updateViaCache: 'none'
+        }).then(function(registration) {
+          // A worker may already be waiting from a previous launch.
+          activateWaitingWorker(registration);
+
+          registration.addEventListener('updatefound', function() {
+            var installing = registration.installing;
+            if (!installing) return;
+
+            installing.addEventListener('statechange', function() {
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                activateWaitingWorker(registration);
+              }
+            });
+          });
+
+          // Explicitly check once per launch rather than waiting for the
+          // browser's normal update interval.
+          registration.update().catch(function() {});
+        }).catch(function(error) {
+          console.error('Service worker registration failed', error);
+        });
+      });
+    })();
   }
 
   if (navigator.storage && navigator.storage.persist) {
