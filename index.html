@@ -482,7 +482,7 @@
     padding: 24px 20px;
     position: relative;
     box-shadow: 0 24px 60px rgba(0,0,0,0.45);
-    transform: scale(0.96);
+    transform: translateY(var(--modal-shift, 0px)) scale(0.96);
     opacity: 0;
     transition: transform 0.18s ease, opacity 0.18s ease;
   }
@@ -503,7 +503,7 @@
   }
   .modal-close:active { background: var(--track); }
   .modal-overlay.show .modal {
-    transform: scale(1);
+    transform: translateY(var(--modal-shift, 0px)) scale(1);
     opacity: 1;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -538,6 +538,16 @@
   .btn-primary { background: var(--gold); color: #14181C; }
   .btn-secondary { background: var(--surface-raised); color: var(--ink); }
   .btn-danger { background: transparent; color: var(--coral); border: 1px solid var(--coral); }
+  .btn-destructive { background: var(--coral); color: #14181C; }
+
+  /* Entry preview inside the delete confirmation */
+  #deleteEntryNote {
+    color: var(--ink);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   #resetSection label {
     display: block;
@@ -833,6 +843,21 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="deleteOverlay">
+  <div class="modal">
+    <h3>Delete this entry?</h3>
+    <p>This can&rsquo;t be undone.</p>
+    <div class="period-summary">
+      <span id="deleteEntryNote">Entry</span>
+      <strong class="num" id="deleteEntryAmount">$0.00</strong>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-secondary" id="deleteCancel">Cancel</button>
+      <button class="btn btn-destructive" id="deleteConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   var STORAGE_KEY = 'funMoneyApp';
@@ -858,15 +883,18 @@
   if (!state.transitionUndo || typeof state.transitionUndo !== 'object') {
     state.transitionUndo = null;
   }
+  // The previous build stored a carried balance inside state.budget. Convert
+  // that adjustment into a protected transaction so it appears in the new
+  // month's activity and history without changing the resulting balance.
+  // Both migrations run before transitionUndo is discarded below, since they
+  // read the close date and source month out of it.
+  migrateOpeningAdjustment();
+  repairRolloverTimestamp();
+
   if (state.transitionUndo &&
       (state.monthKey !== state.transitionUndo.startedMonthKey || hasUserTransactions())) {
     state.transitionUndo = null;
   }
-
-  // The previous build stored a carried balance inside state.budget. Convert
-  // that adjustment into a protected transaction so it appears in the new
-  // month's activity and history without changing the resulting balance.
-  migrateOpeningAdjustment();
 
   var currentType = 'spent';
 
@@ -1021,6 +1049,25 @@
     }
   }
 
+  // Earlier builds dated the rollover entry to the 1st of the new month. Where
+  // the transition record still exists, restore the date the close really
+  // happened. Older rollovers with no surviving record keep the 1st - there's
+  // nothing left to recover the true date from.
+  function repairRolloverTimestamp() {
+    var undo = state.transitionUndo;
+    if (!undo || !undo.startedAt || undo.startedMonthKey !== state.monthKey) return;
+
+    var periodStart = periodStartDate(state.monthKey).getTime();
+    var changed = false;
+    state.entries.forEach(function(entry) {
+      if (isSystemRolloverEntry(entry) && entry.ts === periodStart) {
+        entry.ts = undo.startedAt;
+        changed = true;
+      }
+    });
+    if (changed) save();
+  }
+
   function canUndoTransition() {
     return !!(state.transitionUndo &&
       state.transitionUndo.previous &&
@@ -1048,11 +1095,31 @@
     return sign + '$' + Math.abs(n).toFixed(2);
   }
 
+  // True when a value lands on a whole dollar, within float rounding tolerance.
+  function isWholeDollars(n) {
+    var abs = Math.abs(n);
+    return Math.abs(abs - Math.round(abs)) < 0.005;
+  }
+
+  // Currency with optional cents. Passing false for showCents drops the
+  // trailing ".00" - but only when there genuinely are no cents to lose.
+  function fmtMoney(n, showCents) {
+    var abs = Math.abs(n);
+    var body = (showCents === false && isWholeDollars(abs))
+      ? String(Math.round(abs))
+      : abs.toFixed(2);
+    return (n < 0 ? '-' : '') + '$' + body;
+  }
+
+  // A transaction list shows cents as soon as any single amount in it has
+  // cents, so the column stays aligned. Rollover entries count like any other.
+  function listShowsCents(entries) {
+    return entries.some(function(e) { return !isWholeDollars(e.amount); });
+  }
+
   // Drops trailing .00 so the small header labels stay short ($400/mo, not $400.00/mo)
   function fmtCompact(n) {
-    var abs = Math.abs(n);
-    var isWhole = Math.abs(abs - Math.round(abs)) < 0.005;
-    return (n < 0 ? '-' : '') + '$' + (isWhole ? Math.round(abs).toString() : abs.toFixed(2));
+    return fmtMoney(n, false);
   }
 
   function parseAmount(str) {
@@ -1134,7 +1201,9 @@
     fillEl.style.stroke = gaugeColor;
 
     var amountEl = document.getElementById('remainingAmount');
-    amountEl.textContent = fmt(remaining);
+    // The gauge decides on its own value alone - independent of whether the
+    // transaction list below happens to be showing cents.
+    amountEl.textContent = fmtMoney(remaining, false);
     amountEl.classList.toggle('status-warning', remaining < 0);
 
     document.getElementById('budgetOf').textContent = remaining < 0
@@ -1173,6 +1242,8 @@
       return;
     }
 
+    var showCents = listShowsCents(state.entries);
+
     state.entries.slice().sort(function(a, b) { return b.ts - a.ts; }).forEach(function(e) {
       var row = document.createElement('div');
       var systemRollover = isSystemRolloverEntry(e);
@@ -1188,7 +1259,7 @@
           '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
-          '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmt(e.amount).replace('$','$').replace('-','') + '</div>' +
+          '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, showCents) + '</div>' +
           (systemRollover ? '' : '<button class="delete-btn" data-id="' + e.id + '" aria-label="Delete entry">&times;</button>') +
         '</div>';
 
@@ -1203,13 +1274,9 @@
     });
 
     Array.prototype.forEach.call(list.querySelectorAll('.delete-btn'), function(btn) {
-      btn.addEventListener('click', function() {
-        var id = btn.getAttribute('data-id');
-        state.entries = state.entries.filter(function(e) {
-          return e.id !== id || isSystemRolloverEntry(e);
-        });
-        save();
-        render();
+      btn.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        askDeleteEntry(btn.getAttribute('data-id'));
       });
     });
   }
@@ -1550,7 +1617,9 @@
         amount: Math.round(Math.abs(leftover) * 100) / 100,
         type: leftover > 0 ? 'added' : 'spent',
         note: (leftover > 0 ? 'Surplus' : 'Deficit') + ' carried over from ' + monthKeyName(sourceKey),
-        ts: periodStartDate(targetKey).getTime(),
+        // The moment the rollover actually happened - closing July on the 31st
+        // reads "Jul 31", not "Aug 1".
+        ts: Date.now(),
         system: true,
         kind: 'rollover'
       });
@@ -1579,7 +1648,88 @@
 
   // --- Edit entry ---
   var editOverlay = document.getElementById('editOverlay');
+  var editModal = editOverlay.querySelector('.modal');
+  var editAmountField = document.getElementById('editAmount');
   var editingId = null;
+
+  // The overlay is position:fixed, so once the on-screen keyboard opens it
+  // still covers the whole layout viewport and the modal stays centred behind
+  // the keyboard. Pin the overlay to the visual viewport instead, then nudge
+  // the modal up or down so the amount field - not the modal - lands on the
+  // centre line of what's actually visible. Only runs while the amount field
+  // holds focus; the modal otherwise sits naturally centred.
+  function syncEditModalPosition() {
+    if (!editOverlay.classList.contains('show')) return;
+
+    var vv = window.visualViewport;
+    editOverlay.style.top = (vv ? vv.offsetTop : 0) + 'px';
+    editOverlay.style.height = (vv ? vv.height : window.innerHeight) + 'px';
+    editOverlay.style.bottom = 'auto';
+
+    // Measured from layout geometry (offsetTop/offsetHeight) rather than
+    // getBoundingClientRect, so a transform mid-transition can't feed its own
+    // output back into the next calculation.
+    var contentHeight = editOverlay.clientHeight - 40; // 20px overlay padding each side
+    var modalHeight = editModal.offsetHeight;
+    var fieldCenter = editAmountField.offsetTop + editAmountField.offsetHeight / 2;
+
+    // Flexbox already centres the modal, so this is purely the gap between the
+    // modal's centre and the field's centre.
+    var shift = modalHeight / 2 - fieldCenter;
+
+    // Never shift so far that the modal loses more of itself off-screen than it
+    // already would from simply being taller than the space available.
+    var limit = Math.abs(contentHeight - modalHeight) / 2;
+    if (shift > limit) shift = limit;
+    if (shift < -limit) shift = -limit;
+
+    editOverlay.style.setProperty('--modal-shift', Math.round(shift) + 'px');
+  }
+
+  function resetEditModalPosition() {
+    editOverlay.style.top = '';
+    editOverlay.style.height = '';
+    editOverlay.style.bottom = '';
+    editOverlay.style.removeProperty('--modal-shift');
+  }
+
+  // The keyboard is only up when the amount field is focused, so anything else
+  // means the modal belongs back in its natural centred position.
+  function handleEditViewportChange() {
+    if (!editOverlay.classList.contains('show')) return;
+    if (document.activeElement === editAmountField) syncEditModalPosition();
+    else resetEditModalPosition();
+  }
+
+  // Focus comes from the user tapping the field - the modal never grabs it.
+  editAmountField.addEventListener('focus', function() {
+    // Deferred: iOS places the caret at the tap point after the focus event,
+    // so selecting synchronously here would just be undone.
+    setTimeout(function() {
+      if (document.activeElement !== editAmountField) return;
+      editAmountField.select();
+      editAmountField.setSelectionRange(0, editAmountField.value.length);
+    }, 0);
+
+    syncEditModalPosition();
+    // Backstops for browsers that don't report a VisualViewport resize.
+    setTimeout(syncEditModalPosition, 150);
+    setTimeout(syncEditModalPosition, 400);
+  });
+
+  editAmountField.addEventListener('blur', function() {
+    // Deferred so a tap on Cancel or Save closes the modal first, rather than
+    // animating it back to centre on the way out.
+    setTimeout(handleEditViewportChange, 0);
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleEditViewportChange);
+    window.visualViewport.addEventListener('scroll', handleEditViewportChange);
+  }
+  window.addEventListener('orientationchange', function() {
+    setTimeout(handleEditViewportChange, 250);
+  });
 
   function openEditModal(id) {
     var entry = null;
@@ -1608,16 +1758,16 @@
     amountEl.value = entry.amount.toFixed(2);
     document.getElementById('editNote').value = entry.note || '';
     document.getElementById('editError').classList.remove('show');
-    editOverlay.classList.add('show');
 
-    // Focus synchronously within the tap gesture so the keyboard opens,
-    // with the amount pre-selected so typing replaces it outright.
-    amountEl.focus();
-    amountEl.select();
+    // Opens with nothing focused, so the keyboard stays down until the user
+    // taps a field. Centring kicks in from the amount field's focus handler.
+    resetEditModalPosition();
+    editOverlay.classList.add('show');
   }
 
   function closeEditModal() {
     editOverlay.classList.remove('show');
+    resetEditModalPosition();
     editingId = null;
   }
 
@@ -1668,6 +1818,49 @@
     });
     save();
     closeEditModal();
+    render();
+  });
+
+  // --- Delete entry ---
+  var deleteOverlay = document.getElementById('deleteOverlay');
+  var deletingId = null;
+
+  function askDeleteEntry(id) {
+    var entry = null;
+    state.entries.forEach(function(e) { if (e.id === id) entry = e; });
+    if (!entry || isSystemRolloverEntry(entry)) return;
+
+    deletingId = id;
+    document.getElementById('deleteEntryNote').textContent =
+      entry.note || (entry.type === 'added' ? 'Received' : 'Spent');
+
+    var amountEl = document.getElementById('deleteEntryAmount');
+    amountEl.textContent = (entry.type === 'added' ? '+' : '\u2212') +
+      fmtMoney(entry.amount, listShowsCents(state.entries));
+    amountEl.style.color = entry.type === 'added' ? 'var(--mint)' : 'var(--coral)';
+
+    deleteOverlay.classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    deleteOverlay.classList.remove('show');
+    deletingId = null;
+  }
+
+  deleteOverlay.addEventListener('click', function(ev) {
+    if (ev.target === deleteOverlay) closeDeleteModal();
+  });
+
+  document.getElementById('deleteCancel').addEventListener('click', closeDeleteModal);
+
+  document.getElementById('deleteConfirm').addEventListener('click', function() {
+    if (!deletingId) return;
+    var id = deletingId;
+    state.entries = state.entries.filter(function(e) {
+      return e.id !== id || isSystemRolloverEntry(e);
+    });
+    save();
+    closeDeleteModal();
     render();
   });
 
@@ -1732,6 +1925,7 @@
     if (!snap.entries.length) {
       listEl.innerHTML = '<div class="empty-state">No entries were logged in ' + escapeHtml(monthName) + '.</div>';
     } else {
+      var histShowCents = listShowsCents(snap.entries);
       snap.entries.slice().sort(function(a, b) { return b.ts - a.ts; }).forEach(function(e) {
         var row = document.createElement('div');
         row.className = 'entry-row';
@@ -1742,7 +1936,7 @@
             '<div class="entry-meta">' + dateStr + '</div>' +
           '</div>' +
           '<div class="entry-right">' +
-            '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmt(e.amount).replace('-','') + '</div>' +
+            '<div class="entry-amount ' + e.type + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, histShowCents) + '</div>' +
           '</div>';
         listEl.appendChild(row);
       });
@@ -1815,6 +2009,7 @@
         state.transitionUndo = null;
       }
       migrateOpeningAdjustment();
+      repairRolloverTimestamp();
       if (state.transitionUndo &&
           (state.monthKey !== state.transitionUndo.startedMonthKey || hasUserTransactions())) {
         state.transitionUndo = null;
