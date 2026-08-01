@@ -1101,14 +1101,23 @@
     return Math.abs(abs - Math.round(abs)) < 0.005;
   }
 
+  // Inserts thousands separators into the integer part of a numeric string,
+  // leaving any decimal portion untouched.
+  function addThousandsSeparators(numStr) {
+    var parts = numStr.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+  }
+
   // Currency with optional cents. Passing false for showCents drops the
   // trailing ".00" - but only when there genuinely are no cents to lose.
+  // Always comma-separates the thousands place ($1,234.00).
   function fmtMoney(n, showCents) {
     var abs = Math.abs(n);
     var body = (showCents === false && isWholeDollars(abs))
       ? String(Math.round(abs))
       : abs.toFixed(2);
-    return (n < 0 ? '-' : '') + '$' + body;
+    return (n < 0 ? '-' : '') + '$' + addThousandsSeparators(body);
   }
 
   // A transaction list shows cents as soon as any single amount in it has
@@ -1650,6 +1659,7 @@
   var editOverlay = document.getElementById('editOverlay');
   var editModal = editOverlay.querySelector('.modal');
   var editAmountField = document.getElementById('editAmount');
+  var editNoteField = document.getElementById('editNote');
   var editingId = null;
 
   // The overlay is position:fixed, so once the on-screen keyboard opens it
@@ -1721,6 +1731,16 @@
     // Deferred so a tap on Cancel or Save closes the modal first, rather than
     // animating it back to centre on the way out.
     setTimeout(handleEditViewportChange, 0);
+  });
+
+  // Same select-all-on-tap as the amount field, minus the viewport centring -
+  // that stays specific to the amount field and its keyboard.
+  editNoteField.addEventListener('focus', function() {
+    setTimeout(function() {
+      if (document.activeElement !== editNoteField) return;
+      editNoteField.select();
+      editNoteField.setSelectionRange(0, editNoteField.value.length);
+    }, 0);
   });
 
   if (window.visualViewport) {
