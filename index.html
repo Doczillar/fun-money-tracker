@@ -669,6 +669,102 @@
     margin: 12px 0 0 !important;
   }
 
+  /* ------------------------------------------------------------------
+     Wide layouts: unfolded foldables and tablets in landscape.
+
+     These screens are wide AND short - an unfolded Fold 8 lands near
+     900x660 CSS px - so the scarce resource is height, not width. The
+     win is moving the gauge and entry form beside the list instead of
+     stacking above it, then letting the list scroll on its own while
+     the left rail stays put.
+
+     Both dimensions are in the query on purpose. Keying on width alone
+     would fire this on a phone turned sideways, which is wide but only
+     ~390px tall, and there is no room for it there. The aspect ratio
+     keeps it off a tablet held in portrait, which is wide enough to
+     qualify but has no height pressure to solve.
+     ------------------------------------------------------------------ */
+  @media (min-width: 760px) and (min-height: 520px) and (min-aspect-ratio: 1/1) {
+    html, body { overflow: hidden; }
+
+    .app {
+      max-width: 960px;
+      padding: 20px 24px;
+      min-height: 0;
+      height: 100vh;
+      height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(300px, 350px) minmax(0, 1fr);
+      grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+      grid-template-areas:
+        "masthead   masthead"
+        "alert-new  alert-new"
+        "alert-undo alert-undo"
+        "balance    entries"
+        "form       entries"
+        "rail-slack entries";
+      column-gap: 24px;
+    }
+
+    header { grid-area: masthead; }
+    #newMonthBanner { grid-area: alert-new; }
+    #undoMonthBanner { grid-area: alert-undo; }
+    .balance-card { grid-area: balance; align-self: start; }
+    .entry-form { grid-area: form; align-self: start; margin-bottom: 0; }
+
+    /* The only scrolling region. min-height:0 is what actually lets a
+       grid item shrink below its content and scroll. */
+    .entries {
+      grid-area: entries;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 6px;
+    }
+
+    /* Keeps the "This month" heading and running totals visible while
+       the transactions scroll under it. */
+    .entries h2 {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--bg);
+      margin: 0 4px 10px;
+      padding: 2px 0 8px;
+    }
+  }
+
+  /* Unfolded foldables sit at the short end of the range above, where the
+     full-size gauge and form would crowd out the list. Trim them back.
+     Tablets in landscape clear 740px and keep the full-size gauge. */
+  @media (min-width: 760px) and (min-height: 520px) and (max-height: 740px) and (min-aspect-ratio: 1/1) {
+    header { margin-bottom: 14px; }
+    .balance-card { padding: 20px 18px 18px; margin-bottom: 16px; }
+    .gauge-wrap { width: 168px; height: 168px; }
+    .gauge-center .amount { font-size: 26px; }
+    .entry-form { padding: 14px; }
+  }
+
+  /* Tablets in landscape have enough width that a single column of rows
+     leaves each one uncomfortably wide. Pair them up. */
+  @media (min-width: 1150px) and (min-height: 620px) and (min-aspect-ratio: 1/1) {
+    .app {
+      max-width: 1240px;
+      grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+      column-gap: 28px;
+    }
+
+    #entriesList {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-content: start;
+      gap: 8px;
+    }
+    #entriesList .entry-row { margin-bottom: 0; }
+    #entriesList .empty-state { grid-column: 1 / -1; }
+  }
+
 </style>
 </head>
 <body>
@@ -921,7 +1017,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-08-14b';
+  var APP_BUILD = '2026-08-14c';
   var CIRCUMFERENCE = 2 * Math.PI * 70;
 
   var state = load() || {
@@ -1308,7 +1404,7 @@
     }
 
     if (state.entries.length === 0) {
-      list.innerHTML = '<div class="empty-state">No entries yet. Add your first one above.</div>';
+      list.innerHTML = '<div class="empty-state">No entries yet. Add your first one to get started.</div>';
       return;
     }
 
