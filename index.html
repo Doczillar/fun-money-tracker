@@ -788,9 +788,13 @@
         <button class="btn btn-secondary" id="importBtn">Import file</button>
       </div>
       <div class="modal-btn-row">
+        <button class="btn btn-secondary period-action" id="copyBackupBtn">Copy backup text</button>
+      </div>
+      <div class="modal-btn-row">
         <button class="btn btn-secondary period-action" id="pasteImportBtn">Import pasted text</button>
       </div>
       <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain,text/*" style="display:none">
+      <p class="settings-help" id="buildStamp" style="margin:14px 0 0; text-align:center"></p>
     </div>
   </div>
 </div>
@@ -804,6 +808,7 @@
     <p id="backupTextHelp">Copy this text and send it to your other device, then use Import pasted text there.</p>
     <textarea class="backup-text" id="backupTextArea" readonly spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
     <div class="modal-btn-row">
+      <button class="btn btn-secondary" id="backupDownloadBtn">Save as file</button>
       <button class="btn btn-primary" id="backupCopyBtn">Copy backup</button>
     </div>
     <p class="settings-help" id="backupCopyStatus" style="display:none; margin:10px 0 0"></p>
@@ -914,6 +919,9 @@
 <script>
 (function() {
   var STORAGE_KEY = 'funMoneyApp';
+  // Shown at the bottom of Settings so you can confirm which build a device is
+  // actually running before chasing a bug that a stale cache already fixed.
+  var APP_BUILD = '2026-08-14b';
   var CIRCUMFERENCE = 2 * Math.PI * 70;
 
   var state = load() || {
@@ -1520,6 +1528,7 @@
     document.getElementById('resetSection').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('cancelSettings').style.display = isFirstRun ? 'none' : 'flex';
     if (!isFirstRun) updatePeriodSettings();
+    document.getElementById('buildStamp').textContent = 'Build ' + APP_BUILD;
     overlay.classList.add('show');
   }
 
@@ -2050,9 +2059,19 @@
     return JSON.stringify(state, null, 2);
   }
 
-  // Home-screen installs on iOS report standalone and cannot show a download.
-  function isIOSStandalone() {
-    return window.navigator.standalone === true;
+  // Installed home-screen apps - iOS Safari, Chrome, and Samsung Internet
+  // alike - run without browser chrome, so a download has nowhere to surface.
+  // The tap looks like it did nothing. Detect that and show the text instead.
+  function isInstalledApp() {
+    if (window.navigator.standalone === true) return true;
+    try {
+      if (!window.matchMedia) return false;
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             window.matchMedia('(display-mode: minimal-ui)').matches ||
+             window.matchMedia('(display-mode: fullscreen)').matches;
+    } catch (err) {
+      return false;
+    }
   }
 
   function openBackupText(dataStr, helpText) {
@@ -2086,43 +2105,132 @@
     return copied;
   }
 
+  // Returns false if the download could not even be started. Note that a true
+  // return only means the browser accepted the click - there is no way to
+  // observe whether a file actually landed, which is why installed apps skip
+  // this path entirely rather than gambling on it.
   function tryDownload(dataStr, fileName) {
-    if (isIOSStandalone()) return false;
-    var a = document.createElement('a');
-    if (!('download' in a)) return false;
-    var url = URL.createObjectURL(new Blob([dataStr], { type: 'application/json' }));
-    a.href = url;
-    a.download = fileName;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-    return true;
+    try {
+      var a = document.createElement('a');
+      if (!('download' in a)) return false;
+      if (!window.URL || typeof window.URL.createObjectURL !== 'function') return false;
+      var url = window.URL.createObjectURL(new Blob([dataStr], { type: 'application/json' }));
+      a.href = url;
+      a.download = fileName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() {
+        try { window.URL.revokeObjectURL(url); } catch (err) {}
+      }, 1000);
+      return true;
+    } catch (err) {
+      return false;
+    }
   }
 
-  document.getElementById('exportBtn').addEventListener('click', function() {
-    var fileName = backupFileName();
-    var dataStr = backupJSON();
-    var file = null;
+  // Some browsers - Samsung Internet in an installed app is the one that bit
+  // us - report that they can share files, then neither open the share sheet
+  // nor settle the promise. Treat "no share sheet within a moment and no
+  // answer" as a failure and move on to the next path.
+  function shareBackup(dataStr, fileName, onFail) {
+    if (!navigator.share || !navigator.canShare) return false;
+
+    var file;
     try {
       file = new File([dataStr], fileName, { type: 'application/json' });
     } catch (err) {
-      file = null;
+      return false;
     }
 
-    if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-      navigator.share({ files: [file], title: 'Fun Money backup' })['catch'](function(err) {
-        // A cancelled share sheet is a choice, not a failure - leave it alone.
-        if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
-        if (tryDownload(dataStr, fileName)) return;
-        openBackupText(dataStr, 'Sharing didn\u2019t work on this device. Copy this text instead and send it to your other device.');
-      });
+    var canShareFile = false;
+    try {
+      canShareFile = navigator.canShare({ files: [file] });
+    } catch (err) {
+      canShareFile = false;
+    }
+    if (!canShareFile) return false;
+
+    var done = false;
+    var sheetOpened = false;
+    function noteSheetOpened() { sheetOpened = true; }
+    function cleanup() {
+      window.removeEventListener('blur', noteSheetOpened);
+      document.removeEventListener('visibilitychange', noteSheetOpened);
+    }
+    function finish(failed) {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (failed) onFail();
+    }
+
+    window.addEventListener('blur', noteSheetOpened);
+    document.addEventListener('visibilitychange', noteSheetOpened);
+
+    var pending;
+    try {
+      pending = navigator.share({ files: [file], title: 'Fun Money backup' });
+    } catch (err) {
+      cleanup();
+      return false;
+    }
+    if (!pending || typeof pending.then !== 'function') {
+      cleanup();
+      return false;
+    }
+
+    pending.then(function() {
+      finish(false);
+    })['catch'](function(err) {
+      // A cancelled share sheet is a choice, not a failure - leave it alone.
+      finish(!(err && err.name === 'AbortError'));
+    });
+
+    setTimeout(function() {
+      // The sheet never opened and the promise never answered.
+      if (sheetOpened) return;
+      finish(true);
+    }, 1500);
+
+    return true;
+  }
+
+  function runExport() {
+    var fileName = backupFileName();
+    var dataStr;
+    try {
+      dataStr = backupJSON();
+    } catch (err) {
+      alert('The backup couldn\u2019t be built: ' + (err && err.message ? err.message : 'unknown error'));
       return;
     }
 
-    if (tryDownload(dataStr, fileName)) return;
-    openBackupText(dataStr);
+    function fallback(helpText) {
+      // In a browser tab a download is the nicer result and the user can see
+      // it happen. In an installed app it disappears, so go straight to text.
+      if (!isInstalledApp() && tryDownload(dataStr, fileName)) return;
+      openBackupText(dataStr, helpText);
+    }
+
+    try {
+      var sharing = shareBackup(dataStr, fileName, function() {
+        fallback('Sharing didn\u2019t work on this device. Copy this text instead and paste it on your other device.');
+      });
+      if (sharing) return;
+    } catch (err) {
+      // Fall through to the paths below rather than dying on the button tap.
+    }
+
+    fallback();
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', runExport);
+
+  // Always available, never depends on the share sheet or a download.
+  document.getElementById('copyBackupBtn').addEventListener('click', function() {
+    openBackupText(backupJSON());
   });
 
   document.getElementById('backupCopyBtn').addEventListener('click', function() {
@@ -2143,6 +2251,14 @@
       showCopyStatus('Copied. Paste it somewhere safe, like a note or a message to yourself.');
     } else {
       showCopyStatus('Copying is blocked here. The text is selected - use Copy from the menu.');
+    }
+  });
+
+  document.getElementById('backupDownloadBtn').addEventListener('click', function() {
+    if (tryDownload(backupTextArea.value, backupFileName())) {
+      showCopyStatus('Saved to your downloads as ' + backupFileName() + '. If you don\u2019t see it, copy the text instead.');
+    } else {
+      showCopyStatus('This device won\u2019t save files from an installed app. Copy the text instead.');
     }
   });
 
