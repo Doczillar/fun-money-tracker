@@ -3378,14 +3378,13 @@
 
   // --- Subscription editor ---
 
-  // Which period a subscription entered today would first charge in. If its
-  // day has already gone by, the first charge waits for next month rather than
-  // back-charging the period in progress - the user has almost certainly
-  // already logged this month's payment by hand.
+  // Which period a new subscription's first charge belongs to - always the
+  // currently open period, even when the chosen post date has already gone
+  // by this month. saveSubscription() runs postDueSubscriptions() right
+  // after saving, so a date already passed backdates a transaction into this
+  // period instead of waiting for next month.
   function firstChargeKeyFor(day) {
-    var key = state.monthKey || currentMonthKey();
-    var probe = { day: day };
-    return subscriptionDueDayStart(probe, key) >= startOfToday() ? key : nextMonthKey(key);
+    return state.monthKey || currentMonthKey();
   }
 
   function readSubDay() {
@@ -3410,7 +3409,12 @@
       parts.push(next ? 'Next charge ' + shortDate(next) + '.' : 'No charge left to post this month.');
     } else {
       var key = firstChargeKeyFor(day);
-      parts.push('First charge ' + shortDate(subscriptionDueDayStart({ day: day }, key)) + '.');
+      var dueDate = subscriptionDueDayStart({ day: day }, key);
+      if (dueDate < startOfToday()) {
+        parts.push(shortDate(dueDate) + ' has already passed this month, so saving will add a transaction for it right away.');
+      } else {
+        parts.push('First charge ' + shortDate(dueDate) + '.');
+      }
     }
 
     if (day > 28) {
