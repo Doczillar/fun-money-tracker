@@ -25,6 +25,7 @@
     --coral: #E2694B;
     --mint: #6FBF8B;
     --track: #333E46;
+    --gauge-track: #2C353C;
     --radius: 18px;
   }
 
@@ -128,27 +129,88 @@
   .balance-card {
     background: var(--surface);
     border-radius: 24px;
-    padding: 28px 20px 24px;
+    padding: 22px 20px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
     margin-bottom: 20px;
   }
 
-  .gauge-wrap {
+  .balance-visual {
     position: relative;
-    width: 200px;
-    height: 200px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 2px 0 4px;
   }
 
-  .gauge-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-
-  .gauge-track { stroke: var(--track); }
-  .gauge-fill {
-    stroke: var(--mint);
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+  .bar-track {
+    width: 100%;
+    max-width: 300px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--gauge-track);
+    /* overflow:hidden does the rounding work a stroke linecap used to need
+       fixing up by hand: both ends of the fill inherit the track's rounded
+       corners for free, and the seam between fill and reserve is just two
+       rects meeting - no cap math, no special-casing an edge-to-edge case,
+       nothing that can render inconsistently across browsers. */
+    overflow: hidden;
+    position: relative;
+    margin-top: 20px;
   }
+
+  .bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0%;
+    background: var(--mint);
+    transition: width 0.5s ease, background-color 0.3s ease;
+  }
+
+  /* The reserved slice: the part of the bar already promised to a
+     subscription still to post this month. Always a neutral gray
+     (var(--muted), set in JS), never the mint/gold/coral of the fill - the
+     centre figure has already subtracted this money out, so the slice marks
+     where that subtraction came from rather than restating money that's
+     still available. */
+  .bar-reserve {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0%;
+    width: 0%;
+    background: var(--muted);
+    transition: width 0.5s ease, left 0.5s ease;
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar-fill, .bar-reserve { transition: none; }
+  }
+
+  .reserve-note {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.35;
+    text-align: center;
+  }
+  .reserve-note.show { display: flex; }
+  .reserve-note .reserve-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .reserve-note strong { color: var(--ink); font-weight: 700; }
   @keyframes entryIn {
     from { opacity: 0; transform: translateY(-8px); }
     to { opacity: 1; transform: none; }
@@ -159,12 +221,12 @@
     40% { transform: scale(1.1); }
     100% { transform: scale(1); }
   }
-  .gauge-center .amount.pulse { animation: amountPulse 0.45s ease; }
+  .balance-visual .amount.pulse { animation: amountPulse 0.45s ease; }
 
   .float-amount {
     position: absolute;
     left: 50%;
-    top: 62%;
+    top: 46%;
     transform: translateX(-50%);
     font-weight: 700;
     font-size: 20px;
@@ -178,12 +240,11 @@
   @keyframes floatDown {
     0% { opacity: 0; transform: translate(-50%, -6px); }
     15% { opacity: 1; transform: translate(-50%, 0); }
-    100% { opacity: 0; transform: translate(-50%, 64px); }
+    100% { opacity: 0; transform: translate(-50%, 48px); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .gauge-fill { transition: none; }
     .entry-row.just-added { animation: none; }
-    .gauge-center .amount.pulse { animation: none; }
+    .balance-visual .amount.pulse { animation: none; }
     .float-amount { animation: floatFade 1.1s ease-out forwards; }
   }
   @keyframes floatFade {
@@ -192,21 +253,11 @@
     100% { opacity: 0; }
   }
 
-  .gauge-center {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
-
-  .gauge-center .amount {
+  .balance-visual .amount {
     font-size: 30px;
     font-weight: 700;
   }
-  .gauge-center .of {
+  .balance-visual .of {
     font-size: 12px;
     color: var(--muted);
     margin-top: 4px;
@@ -374,10 +425,43 @@
   .entry-note { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .entry-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
+  /* Marks a transaction the app posted from a subscription. The row itself
+     stays fully editable - only its provenance is different. */
+  .entry-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gold);
+    background: rgba(232, 185, 77, 0.14);
+    border-radius: 999px;
+    padding: 2px 7px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .entry-amount { font-size: 15px; font-weight: 600; }
   .entry-amount.spent { color: var(--coral); }
   .entry-amount.added { color: var(--mint); }
+
+  /* A preview of a subscription charge that hasn't posted yet - not a real
+     transaction, so it can't be deleted (no delete-btn is rendered for it)
+     and tapping it opens the subscription itself rather than an entry
+     editor. Dashed border plus reduced opacity keeps it from being mistaken
+     for something that already happened; the same muted grey the gauge uses
+     for "not really available yet" money carries the same meaning here. */
+  .ghost-entry {
+    opacity: 0.6;
+    border: 1px dashed var(--track);
+    background: none;
+  }
+  .ghost-entry .entry-amount { color: var(--muted); }
+  .entry-tag.ghost-tag {
+    color: var(--muted);
+    background: rgba(139, 149, 157, 0.16);
+  }
 
   .delete-btn {
     background: none;
@@ -416,8 +500,36 @@
     transition: color 0.15s ease, border-color 0.15s ease;
   }
   .history-link.show { display: flex; }
+  /* A little more separation once a second month's link stacks below the
+     first, so the two don't read as one control. */
+  .history-link.show ~ .history-link.show { margin-top: 8px; }
   .history-link:active { color: var(--ink); border-color: var(--muted); }
   .history-link svg { flex-shrink: 0; }
+
+  /* --- Subscriptions --- */
+  .sub-list {
+    max-height: 44vh;
+    overflow-y: auto;
+    margin: 0 -2px;
+    padding: 0 2px;
+  }
+  .sub-list .entry-row {
+    background: var(--surface-raised);
+    margin-bottom: 8px;
+  }
+  .sub-list .entry-row.canceled { opacity: 0.55; }
+  .sub-group-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 700;
+    margin: 4px 4px 8px;
+  }
+  .sub-group-label:not(:first-child) { margin-top: 16px; }
+  /* Neutral rather than coral: this is a standing commitment, not money that
+     has already left the budget. */
+  .sub-list .entry-amount { color: var(--ink); }
 
   .hist-title-row {
     display: flex;
@@ -507,6 +619,12 @@
     transform: translateY(var(--modal-shift, 0px)) scale(0.96);
     opacity: 0;
     transition: transform 0.18s ease, opacity 0.18s ease;
+  }
+  /* Wider than the shared .modal max-width: this is the one modal with a
+     horizontal choice-stack, and "Every few months" needs the extra room to
+     sit on a single line rather than wrapping under its own selected card. */
+  #subEditOverlay .modal {
+    max-width: 440px;
   }
   .modal-close {
     position: absolute;
@@ -641,6 +759,20 @@
     box-shadow: 0 0 0 1px var(--gold);
   }
 
+  /* Cadence is the one choice-stack short enough to sit side by side rather
+     than stacked - a modifier rather than a change to .choice-stack itself,
+     since the other two (month-start, duration) carry longer detail text
+     that needs the full-width layout. align-items: stretch (flex's default)
+     means "Every month" - the shorter card, with no detail line - still
+     matches the taller card's height instead of looking clipped. */
+  .choice-stack-row {
+    flex-direction: row;
+  }
+  .choice-stack-row .choice-card {
+    flex: 1;
+    width: auto;
+  }
+
   .choice-title {
     display: block;
     font-size: 14px;
@@ -652,6 +784,24 @@
     color: var(--muted);
     font-size: 13px;
     margin-top: 3px;
+  }
+
+  /* A number field with its unit spelled out beside it, rather than left
+     for the label alone to imply - "Charges every [5] months" reads as one
+     sentence instead of requiring the label to carry all the meaning. */
+  .input-suffix-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .input-suffix-row input {
+    flex: 1;
+  }
+  .input-suffix-row .input-suffix {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
   }
 
   .period-summary {
@@ -784,8 +934,8 @@
   @media (min-width: 760px) and (min-height: 520px) and (max-height: 740px) and (min-aspect-ratio: 1/1) {
     header { margin-bottom: 14px; }
     .balance-card { padding: 20px 18px 18px; margin-bottom: 16px; }
-    .gauge-wrap { width: 168px; height: 168px; }
-    .gauge-center .amount { font-size: 26px; }
+    .bar-track { max-width: 240px; height: 18px; }
+    .balance-visual .amount { font-size: 26px; }
     .entry-form { padding: 14px; }
   }
 
@@ -825,6 +975,18 @@
           <polyline points="12 7 12 12 15.5 13.5"/>
         </svg>
       </button>
+      <button class="gear" id="openSubsTop" aria-label="Subscriptions">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <g stroke-width="1.9">
+            <path d="M15.08 3.54A9 9 0 1 1 8.92 3.54"/>
+            <polyline points="7.8 5.9 8.9 3.5 6.6 2.4"/>
+          </g>
+          <g stroke-width="1.7">
+            <path d="M12 6.7V17"/>
+            <path d="M14.4 9.7C14.4 8.6 13.4 7.9 12 7.9C10.6 7.9 9.6 8.6 9.6 9.8C9.6 11 10.6 11.4 12 11.7C13.4 11.9 14.4 12.5 14.4 13.6C14.4 14.8 13.4 15.5 12 15.5C10.6 15.5 9.6 14.9 9.6 13.9"/>
+          </g>
+        </svg>
+      </button>
       <button class="gear" id="openSettings" aria-label="Settings">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <mask id="gearCenterHole">
@@ -862,16 +1024,17 @@
   </div>
 
   <div class="balance-card">
-    <div class="gauge-wrap">
-      <svg viewBox="0 0 160 160">
-        <circle class="gauge-track" cx="80" cy="80" r="70" fill="none" stroke-width="14"/>
-        <circle class="gauge-fill" id="gaugeFill" cx="80" cy="80" r="70" fill="none" stroke-width="14"
-          stroke-dasharray="439.8" stroke-dashoffset="0"/>
-      </svg>
-      <div class="gauge-center" role="status" aria-live="polite" aria-atomic="true">
-        <div class="amount num" id="remainingAmount">$0.00</div>
-        <div class="of" id="budgetOf">of $0.00</div>
+    <div class="balance-visual" role="status" aria-live="polite" aria-atomic="true">
+      <div class="amount num" id="remainingAmount">$0.00</div>
+      <div class="of" id="budgetOf">of $0.00</div>
+      <div class="bar-track">
+        <div class="bar-fill" id="barFill"></div>
+        <div class="bar-reserve" id="barReserve"></div>
       </div>
+    </div>
+    <div class="reserve-note" id="reserveNote">
+      <span class="reserve-dot" id="reserveDot" aria-hidden="true"></span>
+      <span id="reserveNoteText"></span>
     </div>
   </div>
 
@@ -894,6 +1057,10 @@
     <button class="history-link" id="historyLink">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg>
       <span id="historyLinkText">View last month&rsquo;s transactions</span>
+    </button>
+    <button class="history-link" id="olderHistoryLink">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg>
+      <span id="olderHistoryLinkText">View the month before</span>
     </button>
   </div>
 
@@ -920,6 +1087,14 @@
       </div>
       <div class="modal-btn-row" id="undoMonthSettingsRow" style="display:none">
         <button class="btn btn-danger period-action" id="undoMonthSettingsBtn">Undo new month</button>
+      </div>
+    </div>
+    <div class="divider" id="subsSettingsDivider" style="display:none"></div>
+    <div id="subsSettingsSection" style="display:none">
+      <label>Subscriptions</label>
+      <p class="settings-help" id="subsSettingsHelp"></p>
+      <div class="modal-btn-row">
+        <button class="btn btn-secondary period-action" id="openSubsFromSettings">Manage subscriptions</button>
       </div>
     </div>
     <div class="divider"></div>
@@ -1026,6 +1201,114 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="subsOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subsTitle">
+    <button class="modal-close" id="subsClose" aria-label="Close subscriptions">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
+    <h3 id="subsTitle">Subscriptions</h3>
+    <p id="subsSubtitle">Subscriptions are automatically deducted from your remaining balance on the subscription post date.</p>
+    <div class="hist-chips" id="subsChips">
+      <div class="hist-chip"><div class="k">This month</div><div class="v num" id="subsMonthlyTotal">$0.00</div></div>
+      <div class="hist-chip"><div class="k">Active</div><div class="v num" id="subsActiveCount">0</div></div>
+      <div class="hist-chip"><div class="k">Still to post</div><div class="v num" id="subsReserved">$0.00</div></div>
+    </div>
+    <div class="sub-list" id="subsList"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-primary" id="subsAddBtn">Add subscription</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="subEditOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subEditTitle">
+    <h3 id="subEditTitle">Add subscription</h3>
+    <p id="subEditSubtitle">Subscriptions are automatically deducted from your remaining balance on the subscription post date.</p>
+
+    <label for="subNote">Description</label>
+    <input class="note-input" id="subNote" type="text" placeholder="Netflix, gym, storage&hellip;" maxlength="40" style="margin-bottom:0">
+    <div class="error-text" id="subNoteError">Give it a name so you can recognize it later.</div>
+
+    <label for="subAmount" style="margin-top:12px">Amount</label>
+    <input class="amount-input" id="subAmount" type="text" inputmode="decimal" placeholder="$0.00" style="width:100%">
+    <div class="error-text" id="subAmountError">Enter an amount greater than $0.</div>
+
+    <label for="subDay" style="margin-top:12px">Subscription post date</label>
+    <input class="note-input num" id="subDay" type="number" inputmode="numeric" min="1" max="31" step="1" style="margin-bottom:0">
+    <div class="error-text" id="subDayError">Enter a day from 1 to 31.</div>
+    <p class="settings-help" id="subDayHelp" style="margin:8px 0 0"></p>
+
+    <label style="margin-top:14px">How often it charges</label>
+    <div class="choice-stack choice-stack-row" id="subCadenceChoices" role="radiogroup" aria-label="How often this subscription charges">
+      <button class="choice-card" type="button" role="radio" aria-checked="false" data-cadence="monthly" id="subCadenceMonthly">
+        <span class="choice-title">Every month</span>
+      </button>
+      <button class="choice-card" type="button" role="radio" aria-checked="false" data-cadence="custom" id="subCadenceCustom">
+        <span class="choice-title">Every few months</span>
+        <span class="choice-detail">Skip months in between</span>
+      </button>
+    </div>
+    <div id="subCadenceMonthsRow" style="display:none">
+      <label for="subCadenceMonths">Charges every</label>
+      <div class="input-suffix-row">
+        <input class="note-input num" id="subCadenceMonths" type="number" inputmode="numeric" min="2" max="60" step="1" style="margin-bottom:0">
+        <span class="input-suffix">months</span>
+      </div>
+      <div class="error-text" id="subCadenceMonthsError">Enter 2 or more months.</div>
+      <p class="settings-help" id="subCadenceMonthsHelp" style="margin:8px 0 0"></p>
+    </div>
+
+    <label style="margin-top:14px">How long it runs</label>
+    <div class="choice-stack" id="subDurationChoices" role="radiogroup" aria-label="How long this subscription runs">
+      <button class="choice-card" type="button" role="radio" aria-checked="false" data-duration="indefinite" id="subDurationForever">
+        <span class="choice-title">Indefinitely</span>
+        <span class="choice-detail">Continues until you cancel it.</span>
+      </button>
+      <button class="choice-card" type="button" role="radio" aria-checked="false" data-duration="months" id="subDurationMonths">
+        <span class="choice-title">For a set number of months</span>
+        <span class="choice-detail" id="subDurationMonthsDetail">Stops on its own once the term is up.</span>
+      </button>
+    </div>
+    <div id="subMonthsRow" style="display:none">
+      <label for="subMonths">Number of months</label>
+      <input class="note-input num" id="subMonths" type="number" inputmode="numeric" min="1" max="600" step="1" style="margin-bottom:0">
+      <div class="error-text" id="subMonthsError">Enter 1 or more months.</div>
+      <p class="settings-help" id="subMonthsHelp" style="margin:8px 0 0"></p>
+    </div>
+
+    <div class="modal-btn-row">
+      <button class="btn btn-secondary" id="subEditCancel">Cancel</button>
+      <button class="btn btn-primary" id="subEditSave">Save</button>
+    </div>
+
+    <div id="subManageRow" style="display:none">
+      <div class="divider"></div>
+      <p class="settings-help" id="subManageHelp"></p>
+      <div class="modal-btn-row">
+        <button class="btn btn-danger period-action" id="subStopBtn">Cancel subscription</button>
+      </div>
+      <div class="modal-btn-row">
+        <button class="btn btn-secondary period-action" id="subDeleteBtn">Delete from list</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="subConfirmOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="subConfirmTitle">
+    <h3 id="subConfirmTitle">Cancel this subscription?</h3>
+    <p id="subConfirmBody"></p>
+    <div class="period-summary">
+      <span id="subConfirmName">Subscription</span>
+      <strong class="num" id="subConfirmAmount">$0.00</strong>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn btn-secondary" id="subConfirmCancel">Never mind</button>
+      <button class="btn btn-destructive" id="subConfirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="recoveryOverlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle">
     <h3 id="recoveryTitle">Fun Money couldn&rsquo;t start</h3>
@@ -1078,8 +1361,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-08-14i';
-  var CIRCUMFERENCE = 2 * Math.PI * 70;
+  var APP_BUILD = '2026-08-24t';
 
   function defaultState() {
     return {
@@ -1088,6 +1370,7 @@
       monthKey: null,
       entries: [],
       history: [],
+      subscriptions: [],
       transitionUndo: null
     };
   }
@@ -1146,6 +1429,39 @@
     var mk = parseMonthKey(key);
     var next = new Date(mk.year, mk.month, 1);
     return next.getFullYear() + '-' + (next.getMonth() + 1);
+  }
+
+  // Month keys are '2026-8', not '2026-08', so they don't compare correctly as
+  // strings. Everything that needs to order or offset them goes through these.
+  function monthKeyIndex(key) {
+    var mk = parseMonthKey(key);
+    return mk.year * 12 + (mk.month - 1);
+  }
+
+  function addMonthsToKey(key, n) {
+    var mk = parseMonthKey(key);
+    var d = new Date(mk.year, mk.month - 1 + n, 1);
+    return d.getFullYear() + '-' + (d.getMonth() + 1);
+  }
+
+  function daysInMonthKey(key) {
+    var mk = parseMonthKey(key);
+    return new Date(mk.year, mk.month, 0).getDate();
+  }
+
+  function ordinal(n) {
+    var mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return n + 'th';
+    switch (n % 10) {
+      case 1: return n + 'st';
+      case 2: return n + 'nd';
+      case 3: return n + 'rd';
+      default: return n + 'th';
+    }
+  }
+
+  function shortDate(d) {
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric' });
   }
 
   function startOfToday() {
@@ -1242,8 +1558,50 @@
     return !!(entry && entry.system === true && entry.kind === 'rollover');
   }
 
+  function isSubscriptionEntry(entry) {
+    return !!(entry && entry.kind === 'subscription' && entry.subId);
+  }
+
+  // "· charge 3 of 6" - only present on a charge posted from a fixed-term
+  // subscription. An indefinite subscription, or an entry predating this
+  // feature, simply has neither field, and this returns nothing to show.
+  function chargeProgressText(entry) {
+    return formatChargeProgress(entry.chargeIndex, entry.chargeCount);
+  }
+
+  function formatChargeProgress(index, count) {
+    return (index && count) ? ' \u00b7 charge ' + index + ' of ' + count : '';
+  }
+
+  // The shared math behind "charge 3 of 6", used both to bake a number into
+  // an entry the moment it posts (postDueSubscriptions) and to preview the
+  // same number on a ghost card before it has. Null for an indefinite
+  // subscription - there's no "of M" to report.
+  //
+  // Counted in actual charges, not calendar months: a charge every 5 months
+  // over a 12-month term is 3 charges (months 1, 6, 11), not 12 - dividing
+  // each calendar offset by the cadence turns "which month is this" into
+  // "which charge is this".
+  function chargeProgressFor(sub, monthKey) {
+    if (!sub.endMonthKey) return null;
+    var cadence = sub.cadenceMonths || 1;
+    var offset = monthKeyIndex(monthKey) - monthKeyIndex(sub.startMonthKey);
+    var span = monthKeyIndex(sub.endMonthKey) - monthKeyIndex(sub.startMonthKey);
+    return {
+      index: Math.floor(offset / cadence) + 1,
+      count: Math.floor(span / cadence) + 1
+    };
+  }
+
+  // Gates the undo-a-month-transition option. A subscription charge is posted
+  // by the app, not typed by the user, so it must not count here - otherwise
+  // starting a month that happens to contain a due subscription would lock the
+  // undo before the user had done anything at all. Undo restores the
+  // subscription records alongside the entries, so rolling back is still safe.
   function hasUserTransactions() {
-    return state.entries.some(function(entry) { return !isSystemRolloverEntry(entry); });
+    return state.entries.some(function(entry) {
+      return !isSystemRolloverEntry(entry) && !isSubscriptionEntry(entry);
+    });
   }
 
   function migrateOpeningAdjustment() {
@@ -1373,6 +1731,27 @@
     if (raw.system === true && raw.kind === 'rollover') {
       entry.system = true;
       entry.kind = 'rollover';
+    } else if (raw.kind === 'subscription' &&
+        (typeof raw.subId === 'string' || typeof raw.subId === 'number')) {
+      // Deliberately not flagged as a system entry: these stay editable and
+      // deletable like anything else the user spent money on.
+      entry.kind = 'subscription';
+      entry.subId = String(raw.subId);
+
+      // "Charge 3 of 6" - present only on charges from a fixed-term
+      // subscription, baked in at posting time rather than looked up live
+      // (see postDueSubscriptions), so it's kept only when both halves are
+      // sane on their own terms.
+      var chargeIndex = finiteNumber(raw.chargeIndex, null);
+      var chargeCount = finiteNumber(raw.chargeCount, null);
+      if (chargeIndex !== null && chargeCount !== null) {
+        chargeIndex = Math.floor(chargeIndex);
+        chargeCount = Math.floor(chargeCount);
+        if (chargeIndex >= 1 && chargeCount >= 1 && chargeIndex <= chargeCount) {
+          entry.chargeIndex = chargeIndex;
+          entry.chargeCount = chargeCount;
+        }
+      }
     }
     return entry;
   }
@@ -1384,6 +1763,63 @@
     for (var i = 0; i < raw.length; i++) {
       var entry = sanitizeEntry(raw[i], seenIds);
       if (entry) out.push(entry);
+    }
+    return out;
+  }
+
+  // A subscription is a rule, not a transaction, so the bar for keeping one is
+  // higher: without a usable amount, day, and start period it can't be posted
+  // at all, and a half-guessed rule would quietly charge the wrong month.
+  function sanitizeSubscription(raw, seenIds) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+
+    var id = (typeof raw.id === 'string' || typeof raw.id === 'number') ? String(raw.id) : '';
+    // Duplicates are dropped rather than reassigned. Posted charges point back
+    // here by subId, so handing out a new id would orphan them and let the
+    // same month post a second time.
+    if (!id || seenIds[id]) return null;
+
+    var amount = finiteNumber(raw.amount, null);
+    if (amount === null || amount <= 0) return null;
+
+    var day = finiteNumber(raw.day, null);
+    if (day === null) return null;
+    day = Math.floor(day);
+    if (day < 1 || day > 31) return null;
+
+    var startMonthKey = validMonthKey(raw.startMonthKey);
+    if (!startMonthKey) return null;
+
+    // Defaults to 1 (every month) rather than dropping the subscription -
+    // absent or malformed cadence is exactly what a pre-cadence backup
+    // looks like, and that should keep behaving the way it always did.
+    var cadenceMonths = finiteNumber(raw.cadenceMonths, 1);
+    cadenceMonths = Math.floor(cadenceMonths);
+    if (!(cadenceMonths >= 1)) cadenceMonths = 1;
+
+    seenIds[id] = true;
+
+    var canceledAt = finiteNumber(raw.canceledAt, 0);
+    return {
+      id: id,
+      amount: Math.round(amount * 100) / 100,
+      note: typeof raw.note === 'string' ? raw.note.slice(0, 60) : '',
+      day: day,
+      startMonthKey: startMonthKey,
+      cadenceMonths: cadenceMonths,
+      endMonthKey: validMonthKey(raw.endMonthKey),
+      canceledAt: canceledAt > 0 ? canceledAt : null,
+      lastPostedKey: validMonthKey(raw.lastPostedKey)
+    };
+  }
+
+  function sanitizeSubscriptionList(raw) {
+    if (!Array.isArray(raw)) return [];
+    var seenIds = {};
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var sub = sanitizeSubscription(raw[i], seenIds);
+      if (sub) out.push(sub);
     }
     return out;
   }
@@ -1422,18 +1858,26 @@
     var prevMonthKey = validMonthKey(prev.monthKey);
     if (!prevMonthKey) return null;
 
+    var previous = {
+      monthKey: prevMonthKey,
+      baseBudget: finiteNumber(prev.baseBudget, 0),
+      budget: finiteNumber(prev.budget, 0),
+      entries: sanitizeEntryList(prev.entries),
+      history: sanitizeHistory(prev.history)
+    };
+    // Only carried when the field is genuinely present. An undo record written
+    // by a build that predates subscriptions has no opinion about them, and
+    // defaulting to [] here would let an undo wipe the user's list.
+    if (Array.isArray(prev.subscriptions)) {
+      previous.subscriptions = sanitizeSubscriptionList(prev.subscriptions);
+    }
+
     return {
       sourceMonthKey: sourceMonthKey,
       startedMonthKey: startedMonthKey,
       rolledOver: raw.rolledOver === true,
       startedAt: finiteNumber(raw.startedAt, 0),
-      previous: {
-        monthKey: prevMonthKey,
-        baseBudget: finiteNumber(prev.baseBudget, 0),
-        budget: finiteNumber(prev.budget, 0),
-        entries: sanitizeEntryList(prev.entries),
-        history: sanitizeHistory(prev.history)
-      }
+      previous: previous
     };
   }
 
@@ -1444,8 +1888,9 @@
       var snap = sanitizeSnapshot(raw[i]);
       if (snap) out.push(snap);
     }
-    // The app only ever surfaces the most recent closed month.
-    return out.slice(-1);
+    // Two closed months are surfaced: the previous month via the main link,
+    // and the one before it via a second link beneath it.
+    return out.slice(-2);
   }
 
   // Returns null when the input could not be a Fun Money state at all.
@@ -1469,6 +1914,9 @@
       monthKey: validMonthKey(raw.monthKey),
       entries: sanitizeEntryList(raw.entries),
       history: sanitizeHistory(raw.history),
+      // Absent in backups written before this feature existed, which is
+      // exactly what an empty list means.
+      subscriptions: sanitizeSubscriptionList(raw.subscriptions),
       transitionUndo: sanitizeTransitionUndo(raw.transitionUndo)
     };
   }
@@ -1539,6 +1987,227 @@
     return isNaN(n) ? NaN : n;
   }
 
+  // --- Subscription scheduling -------------------------------------------
+
+  function findSubscription(id) {
+    var found = null;
+    state.subscriptions.forEach(function(sub) { if (sub.id === id) found = sub; });
+    return found;
+  }
+
+  // The calendar date a subscription falls due inside a given budget period.
+  // The day is clamped to the length of that month, so a charge on the 31st
+  // still lands on Feb 28 rather than silently skipping February.
+  function subscriptionDueDate(sub, monthKey) {
+    var mk = parseMonthKey(monthKey);
+    var day = Math.min(sub.day, daysInMonthKey(monthKey));
+    // Midday, so a charge sorts cleanly among same-day entries and survives a
+    // day-of-month edit through the normal entry editor.
+    return new Date(mk.year, mk.month - 1, day, 12, 0, 0, 0);
+  }
+
+  function subscriptionDueDayStart(sub, monthKey) {
+    var due = subscriptionDueDate(sub, monthKey);
+    return new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  }
+
+  // Whether a subscription is scheduled to charge in a period at all, setting
+  // aside what today's date is. Cancelling stops it everywhere from now on; a
+  // fixed term stops it after its final period; a cadence beyond monthly
+  // rules out every month that isn't an exact multiple of it away from the
+  // start - the start month itself always qualifies (0 is a multiple of
+  // anything).
+  function subscriptionChargesIn(sub, monthKey) {
+    if (!monthKey) return false;
+    if (sub.canceledAt) return false;
+    var idx = monthKeyIndex(monthKey);
+    var startIdx = monthKeyIndex(sub.startMonthKey);
+    if (idx < startIdx) return false;
+    if (sub.endMonthKey && idx > monthKeyIndex(sub.endMonthKey)) return false;
+    var cadence = sub.cadenceMonths || 1;
+    if ((idx - startIdx) % cadence !== 0) return false;
+    return true;
+  }
+
+  function alreadyPostedFor(sub, monthKey) {
+    return !!sub.lastPostedKey && monthKeyIndex(sub.lastPostedKey) >= monthKeyIndex(monthKey);
+  }
+
+  // Two states, as shown on the pill. A term that ran out reads as canceled
+  // too; the row's meta line is where the difference gets explained.
+  function subscriptionIsActive(sub) {
+    if (sub.canceledAt) return false;
+    if (sub.endMonthKey && state.monthKey &&
+        monthKeyIndex(state.monthKey) > monthKeyIndex(sub.endMonthKey)) return false;
+    return true;
+  }
+
+  // Nothing runs while the app is closed, so charges are generated on demand:
+  // at launch, when the app comes back to the foreground, after a month
+  // transition, and after an import.
+  //
+  // The guard against duplicates lives on the subscription (lastPostedKey),
+  // never on a scan of state.entries. If it scanned entries instead, deleting
+  // a posted charge - a refund, a comped month - would make it reappear the
+  // next time the app opened.
+  //
+  // Returns true when anything was posted, so callers know to save.
+  function postDueSubscriptions() {
+    if (!state.monthKey || !state.subscriptions.length) return false;
+
+    var today = startOfToday();
+    var posted = false;
+
+    state.subscriptions.forEach(function(sub) {
+      if (!subscriptionChargesIn(sub, state.monthKey)) return;
+      if (alreadyPostedFor(sub, state.monthKey)) return;
+      if (today < subscriptionDueDayStart(sub, state.monthKey)) return;
+
+      var entry = {
+        id: 'sub-' + sub.id + '-' + state.monthKey,
+        amount: sub.amount,
+        type: 'spent',
+        note: sub.note,
+        // Backdated to the day it was actually due, so opening the app late
+        // drops the charge into the right place in the list rather than at
+        // the top under today's date.
+        ts: subscriptionDueDate(sub, state.monthKey).getTime(),
+        kind: 'subscription',
+        subId: sub.id
+      };
+
+      // A fixed-term subscription gets its position baked in right now -
+      // "charge 3 of 6" - rather than computed live from the subscription's
+      // current state whenever the entry is displayed. Baking it in means
+      // editing the term later, or deleting the subscription outright, never
+      // rewrites what an already-posted charge says about itself.
+      var progress = chargeProgressFor(sub, state.monthKey);
+      if (progress) {
+        entry.chargeIndex = progress.index;
+        entry.chargeCount = progress.count;
+      }
+
+      state.entries.push(entry);
+      sub.lastPostedKey = state.monthKey;
+      posted = true;
+    });
+
+    return posted;
+  }
+
+  function monthKeyFromTimestamp(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + (d.getMonth() + 1);
+  }
+
+  // Silent housekeeping, not a user-facing action: a subscription canceled
+  // over a year ago is long past being useful to look at again, so it's
+  // dropped from the list the same way "Delete from list" would drop it -
+  // charges it already posted stay exactly where they are, untouched, since
+  // deleting a subscription has never touched its past entries. The one real
+  // consequence is that it can no longer be resumed; a subscription meant to
+  // be picked back up after that long is closer to a new one anyway.
+  //
+  // Measured in calendar months against the real current date, not
+  // state.monthKey - this is about how much wall-clock time has actually
+  // passed, not the app's own budget period, which can lag behind for weeks
+  // if old months haven't been closed out yet.
+  //
+  // Deliberately scoped to actual cancellations (canceledAt set), not a
+  // subscription whose fixed term simply ran out - those are a different
+  // state in the data model even though both show a "Canceled" pill.
+  //
+  // Returns true when anything was removed, so callers know to save.
+  function purgeStaleCanceledSubscriptions() {
+    var nowIdx = monthKeyIndex(currentMonthKey());
+    var before = state.subscriptions.length;
+    state.subscriptions = state.subscriptions.filter(function(sub) {
+      if (!sub.canceledAt) return true;
+      var canceledIdx = monthKeyIndex(monthKeyFromTimestamp(sub.canceledAt));
+      return (nowIdx - canceledIdx) <= 12;
+    });
+    return state.subscriptions.length !== before;
+  }
+
+  // What the subscriptions will still take out of the current period. Charges
+  // that have already posted are excluded, since the balance has counted them
+  // already - this is only the part the gauge hasn't felt yet.
+  function reservedThisPeriod() {
+    if (!state.monthKey) return 0;
+    var total = 0;
+    state.subscriptions.forEach(function(sub) {
+      if (!subscriptionChargesIn(sub, state.monthKey)) return;
+      if (alreadyPostedFor(sub, state.monthKey)) return;
+      total += sub.amount;
+    });
+    return Math.round(total * 100) / 100;
+  }
+
+  // The same subscriptions reservedThisPeriod sums, but as a list rather
+  // than a total - these are the ones a ghost card gets drawn for. Since
+  // postDueSubscriptions runs before every render, anything still in this
+  // list genuinely hasn't come due yet; it isn't a stale or overdue charge
+  // waiting on a boot that hasn't happened.
+  function upcomingSubscriptionsThisPeriod() {
+    if (!state.monthKey) return [];
+    var list = [];
+    state.subscriptions.forEach(function(sub) {
+      if (!subscriptionChargesIn(sub, state.monthKey)) return;
+      if (alreadyPostedFor(sub, state.monthKey)) return;
+      list.push(sub);
+    });
+    return list;
+  }
+
+  // Everything scheduled for the current period, posted or not.
+  // What subscriptions have actually taken out of this period so far, read off
+  // the transactions themselves rather than the schedule. Using the entries
+  // means an amount the user corrected by hand is the amount reported here.
+  function postedSubscriptionTotal() {
+    var total = 0;
+    state.entries.forEach(function(entry) {
+      if (isSubscriptionEntry(entry)) total += entry.amount;
+    });
+    return Math.round(total * 100) / 100;
+  }
+
+  // What subscriptions cost in this period, start to finish.
+  //
+  // Deliberately posted-plus-reserved rather than a sum over the schedule.
+  // Cancelling and reinstating both rewrite the schedule for a period that is
+  // already part-way through, so a schedule-derived figure disagrees with the
+  // transaction list in both directions: it forgets a charge that a since-
+  // cancelled subscription really did make, and it counts one for a
+  // reinstated subscription whose date has already gone by. Adding up what
+  // happened and what is still owed cannot drift from what is on screen.
+  function subscriptionTotalThisPeriod() {
+    if (!state.monthKey) return 0;
+    return Math.round((postedSubscriptionTotal() + reservedThisPeriod()) * 100) / 100;
+  }
+
+  // The next date this subscription will post, or null if it has none left.
+  // How far ahead this needs to look depends on the cadence: a charge that
+  // lands every N months could be as much as N months past the current
+  // period (worst case: this period is itself a charging month but has
+  // already posted, so the next one is a full cycle away). N+1 iterations
+  // covers that with room to spare; for the common monthly case that's the
+  // same 2-period lookahead this always used.
+  function nextChargeDate(sub) {
+    if (!state.monthKey || sub.canceledAt) return null;
+    var today = startOfToday();
+    var key = state.monthKey;
+    var cadence = sub.cadenceMonths || 1;
+
+    for (var i = 0; i < cadence + 1; i++) {
+      if (subscriptionChargesIn(sub, key) && !alreadyPostedFor(sub, key)) {
+        var dueDay = subscriptionDueDayStart(sub, key);
+        if (dueDay >= today) return dueDay;
+      }
+      key = nextMonthKey(key);
+    }
+    return null;
+  }
+
   function computeRemaining() {
     var total = state.budget || 0;
     state.entries.forEach(function(e) {
@@ -1577,6 +2246,7 @@
 
     var histLink = document.getElementById('historyLink');
     var histTopBtn = document.getElementById('openHistoryTop');
+    var olderLink = document.getElementById('olderHistoryLink');
     if (state.history.length) {
       var lastArchived = state.history[state.history.length - 1];
       var archivedName = monthKeyName(lastArchived.monthKey);
@@ -1590,6 +2260,17 @@
       histTopBtn.style.display = 'none';
     }
 
+    // The second link only appears once a second closed month exists, so a
+    // user one month in never sees a control that would open nothing.
+    if (state.history.length > 1) {
+      var olderName = monthKeyName(state.history[state.history.length - 2].monthKey);
+      document.getElementById('olderHistoryLinkText').innerHTML =
+        'View ' + escapeHtml(olderName) + '&rsquo;s transactions';
+      olderLink.classList.add('show');
+    } else {
+      olderLink.classList.remove('show');
+    }
+
     document.getElementById('baseLabel').textContent =
       state.baseBudget ? fmtCompact(state.baseBudget) + '/mo \u00b7 ' : '';
 
@@ -1597,32 +2278,86 @@
     var remaining = computeRemaining();
     var gaugeMax = Math.max(state.baseBudget || 0, budget, 0.01);
     var ratio = Math.max(0, Math.min(1, remaining / gaugeMax));
-    var offset = CIRCUMFERENCE * (1 - ratio);
 
-    var fillEl = document.getElementById('gaugeFill');
-    fillEl.setAttribute('stroke-dashoffset', offset);
+    var barFill = document.getElementById('barFill');
+    barFill.style.width = (ratio * 100) + '%';
+
+    // The figure the person actually sees treats money already promised to a
+    // subscription as gone, even before it posts - that's the whole point of
+    // showing it gray on the bar. This is purely a display-time adjustment:
+    // computeRemaining() itself is untouched, so the ledger, month-close, and
+    // rollover math all still work from the real (unposted-subscriptions-
+    // included) balance.
+    var trueRemaining = Math.round((remaining - reservedThisPeriod()) * 100) / 100;
 
     var gaugeColor;
-    if (remaining < (state.baseBudget || budget) * 0.2) {
+    if (trueRemaining < (state.baseBudget || budget) * 0.2) {
       gaugeColor = 'var(--coral)';
-    } else if (remaining < (state.baseBudget || budget) / 3) {
+    } else if (trueRemaining < (state.baseBudget || budget) / 3) {
       gaugeColor = 'var(--gold)';
     } else {
       gaugeColor = 'var(--mint)';
     }
-    fillEl.style.stroke = gaugeColor;
+    barFill.style.background = gaugeColor;
 
     var amountEl = document.getElementById('remainingAmount');
     // The gauge decides on its own value alone - independent of whether the
     // transaction list below happens to be showing cents.
-    amountEl.textContent = fmtMoney(remaining, false);
-    amountEl.classList.toggle('status-warning', remaining < 0);
+    amountEl.textContent = fmtMoney(trueRemaining, false);
+    amountEl.classList.toggle('status-warning', trueRemaining < 0);
 
-    document.getElementById('budgetOf').textContent = remaining < 0
+    document.getElementById('budgetOf').textContent = trueRemaining < 0
       ? 'over this month\u2019s budget'
       : 'remaining';
 
+    renderReserve(remaining, ratio, gaugeMax);
     renderEntries();
+  }
+
+  // The gray slice on the bar: the part already promised to a subscription
+  // still to post this month. Unlike the fill, it isn't colour-coded to the
+  // mint/gold/coral status - it's deliberately neutral, so it reads at a
+  // glance as money that isn't really available, the same way the unfilled
+  // track does. The centre figure agrees: it already has this amount
+  // subtracted out, so the gray slice is showing where that subtraction
+  // came from, not restating money the person still has.
+  //
+  // Unlike the ring this replaced, there's no cap-dot or edge-case math
+  // needed here: two rects inside an overflow:hidden pill naturally get
+  // their rounding from the container, and a seam between them is just
+  // where one rect ends and the next begins - nothing to special-case even
+  // when they fill the entire bar.
+  function renderReserve(remaining, ratio, gaugeMax) {
+    var reserved = reservedThisPeriod();
+    var barReserve = document.getElementById('barReserve');
+    var note = document.getElementById('reserveNote');
+
+    if (reserved < 0.005) {
+      barReserve.style.display = 'none';
+      note.classList.remove('show');
+      return;
+    }
+
+    if (remaining > 0) {
+      // Capped at the fill that actually exists: when more is owed than is
+      // left, the whole visible bar is spoken for.
+      var reserveRatio = Math.max(0, Math.min(ratio, reserved / gaugeMax));
+      barReserve.style.left = ((ratio - reserveRatio) * 100) + '%';
+      barReserve.style.width = (reserveRatio * 100) + '%';
+      barReserve.style.display = 'block';
+    } else {
+      // Nothing left to carve a slice out of - the note carries the message.
+      barReserve.style.display = 'none';
+    }
+
+    // Neutral regardless of band - deliberately not mint/gold/coral, so it
+    // never reads as "part of your available money," just "spoken for."
+    var GRAY = 'var(--muted)';
+    document.getElementById('reserveDot').style.background = GRAY;
+    document.getElementById('reserveNoteText').innerHTML =
+      '<strong class="num">' + escapeHtml(fmtMoney(reserved, false)) +
+      '</strong> set aside for upcoming subscriptions';
+    note.classList.add('show');
   }
 
   function renderEntries() {
@@ -1636,6 +2371,10 @@
     // month's closing figure, not activity in this one, so counting it
     // would overstate this month either way: a carried deficit reads as
     // money spent, a carried surplus as money received.
+    //
+    // Ghost cards are left out of this on purpose - they're a preview, not
+    // activity that happened, and the gauge already accounts for them
+    // separately (as the grey slice and the "set aside" note).
     var totalReceived = 0;
     var totalSpent = 0;
     state.entries.forEach(function(e) {
@@ -1655,12 +2394,51 @@
       totalsEl.style.display = 'none';
     }
 
-    if (state.entries.length === 0) {
+    var upcoming = upcomingSubscriptionsThisPeriod();
+
+    if (state.entries.length === 0 && upcoming.length === 0) {
       list.innerHTML = '<div class="empty-state">No entries yet. Add your first one to get started.</div>';
       return;
     }
 
-    var showCents = listShowsCents(state.entries);
+    // A ghost's amount counts toward the whole-list cents decision too -
+    // otherwise a $15.99 ghost could show as "$16" just because every real
+    // entry this month happens to be a whole dollar, breaking the column
+    // alignment it was meant to preserve.
+    var showCents = listShowsCents(state.entries) ||
+      upcoming.some(function(sub) { return !isWholeDollars(sub.amount); });
+
+    // Soonest first, so the ghost block reads like a countdown into today's
+    // real activity just below it, rather than the furthest-off charge
+    // taking the most prominent spot.
+    upcoming.slice().sort(function(a, b) {
+      return subscriptionDueDayStart(a, state.monthKey) - subscriptionDueDayStart(b, state.monthKey);
+    }).forEach(function(sub) {
+      var row = document.createElement('div');
+      row.className = 'entry-row ghost-entry';
+
+      var dueDate = subscriptionDueDayStart(sub, state.monthKey);
+      var dateLabel = dayDifference(dueDate, startOfToday()) === 0 ? 'Today' : shortDate(dueDate);
+      var progress = chargeProgressFor(sub, state.monthKey);
+
+      row.innerHTML =
+        '<div class="entry-left">' +
+          '<div class="entry-note">' + escapeHtml(sub.note || 'Subscription') + '</div>' +
+          '<div class="entry-meta">' + escapeHtml(dateLabel) +
+            formatChargeProgress(progress && progress.index, progress && progress.count) +
+            '<span class="entry-tag ghost-tag">Upcoming</span></div>' +
+        '</div>' +
+        '<div class="entry-right">' +
+          '<div class="entry-amount ghost-amount num">\u2212' + fmtMoney(sub.amount, showCents) + '</div>' +
+        '</div>';
+
+      // No delete button, and no way to dismiss it - it isn't a transaction
+      // yet, so there's nothing here to remove. Tapping goes to the
+      // subscription itself, the only place this is actually editable from.
+      row.addEventListener('click', function() { openSubEditor(sub.id); });
+
+      list.appendChild(row);
+    });
 
     state.entries.slice().sort(function(a, b) { return b.ts - a.ts; }).forEach(function(e) {
       var row = document.createElement('div');
@@ -1677,7 +2455,9 @@
       row.innerHTML =
         '<div class="entry-left">' +
           '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
-          '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') + '</div>' +
+          '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') +
+            chargeProgressText(e) +
+            (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
           '<div class="entry-amount ' + escapeAttr(e.type) + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, showCents) + '</div>' +
@@ -1801,7 +2581,7 @@
     var floatEl = document.createElement('div');
     floatEl.className = 'float-amount ' + entryType + ' num';
     floatEl.textContent = (entryType === 'added' ? '+' : '\u2212') + '$' + entryAmount.toFixed(2);
-    var wrap = document.querySelector('.gauge-wrap');
+    var wrap = document.querySelector('.balance-visual');
     wrap.appendChild(floatEl);
     var removed = false;
     function removeFloat() {
@@ -1890,7 +2670,12 @@
     document.getElementById('resetDivider').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('resetSection').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('cancelSettings').style.display = isFirstRun ? 'none' : 'flex';
-    if (!isFirstRun) updatePeriodSettings();
+    document.getElementById('subsSettingsDivider').style.display = isFirstRun ? 'none' : 'block';
+    document.getElementById('subsSettingsSection').style.display = isFirstRun ? 'none' : 'block';
+    if (!isFirstRun) {
+      updatePeriodSettings();
+      updateSubsSettings();
+    }
     document.getElementById('buildStamp').textContent = 'Build ' + APP_BUILD;
     overlay.classList.add('show');
   }
@@ -1990,7 +2775,11 @@
     state.monthKey = previous.monthKey;
     state.budget = Math.round((state.baseBudget + priorAdjustment) * 100) / 100;
     state.entries = cloneData(previous.entries || []);
-    state.history = cloneData(previous.history || []).slice(-1);
+    state.history = cloneData(previous.history || []).slice(-2);
+    // Rolls lastPostedKey back with everything else, so the restored month's
+    // subscription charges are recognized as already posted rather than
+    // duplicated the next time the app checks.
+    if (previous.subscriptions) state.subscriptions = cloneData(previous.subscriptions);
     state.transitionUndo = null;
     save();
     closeSettings();
@@ -2026,10 +2815,13 @@
       baseBudget: state.baseBudget,
       budget: state.budget,
       entries: cloneData(state.entries),
-      history: cloneData(state.history)
+      history: cloneData(state.history),
+      subscriptions: cloneData(state.subscriptions)
     };
 
-    state.history = [{
+    // Appended, not replaced: the month being closed joins the previously
+    // closed one, and the pair is trimmed to the two the app surfaces.
+    state.history = state.history.concat([{
       monthKey: sourceKey,
       baseBudget: state.baseBudget,
       openingBalance: state.budget,
@@ -2039,7 +2831,7 @@
       closedAt: Date.now(),
       nextMonthKey: targetKey,
       entries: cloneData(state.entries)
-    }];
+    }]).slice(-2);
 
     state.monthKey = targetKey;
     state.budget = state.baseBudget;
@@ -2066,6 +2858,11 @@
       startedAt: Date.now(),
       previous: previousState
     };
+
+    // Catch up the new period immediately. Closing a month late means its
+    // early-in-the-month subscriptions are already due; closing it early means
+    // this finds nothing and they post on their actual dates instead.
+    postDueSubscriptions();
 
     save();
     closeConfirm();
@@ -2312,8 +3109,10 @@
   // --- Last month history ---
   var historyOverlay = document.getElementById('historyOverlay');
 
-  function openHistoryModal() {
-    var snap = state.history[state.history.length - 1];
+  // depth 0 is the most recently closed month, depth 1 the one before it.
+  // History keeps at most two, so those are the only values used.
+  function openHistoryModal(depth) {
+    var snap = state.history[state.history.length - 1 - (depth || 0)];
     if (!snap) return;
 
     var monthName = monthKeyName(snap.monthKey);
@@ -2395,7 +3194,9 @@
         row.innerHTML =
           '<div class="entry-left">' +
             '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
-            '<div class="entry-meta">' + dateStr + '</div>' +
+            '<div class="entry-meta">' + dateStr +
+              chargeProgressText(e) +
+              (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') + '</div>' +
           '</div>' +
           '<div class="entry-right">' +
             '<div class="entry-amount ' + escapeAttr(e.type) + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, histShowCents) + '</div>' +
@@ -2411,11 +3212,557 @@
     historyOverlay.classList.remove('show');
   }
 
-  document.getElementById('historyLink').addEventListener('click', openHistoryModal);
-  document.getElementById('openHistoryTop').addEventListener('click', openHistoryModal);
+  document.getElementById('historyLink').addEventListener('click', function() { openHistoryModal(0); });
+  document.getElementById('openHistoryTop').addEventListener('click', function() { openHistoryModal(0); });
+  document.getElementById('olderHistoryLink').addEventListener('click', function() { openHistoryModal(1); });
   document.getElementById('historyClose').addEventListener('click', closeHistoryModal);
   historyOverlay.addEventListener('click', function(ev) {
     if (ev.target === historyOverlay) closeHistoryModal();
+  });
+
+  // --- Subscriptions UI ---------------------------------------------------
+  var subsOverlay = document.getElementById('subsOverlay');
+  var subEditOverlay = document.getElementById('subEditOverlay');
+  var subConfirmOverlay = document.getElementById('subConfirmOverlay');
+  var editingSubId = null;
+  var pendingDuration = null;
+  var pendingCadence = null;
+  var pendingSubAction = null;
+  var pendingSubActionId = null;
+
+  function updateSubsSettings() {
+    var active = state.subscriptions.filter(subscriptionIsActive).length;
+    var total = subscriptionTotalThisPeriod();
+    var help = document.getElementById('subsSettingsHelp');
+    var btn = document.getElementById('openSubsFromSettings');
+
+    if (!state.subscriptions.length) {
+      help.textContent = 'Record a recurring charge once and it will be subtracted automatically on its schedule.';
+      btn.textContent = 'Add a subscription';
+    } else {
+      help.textContent = active + (active === 1 ? ' active subscription' : ' active subscriptions') +
+        (total >= 0.005 ? ', ' + fmtCompact(total) + ' this month.' : '.');
+      btn.textContent = 'Manage subscriptions';
+    }
+  }
+
+  // Active first, ordered by the day they charge, so the list reads as a
+  // calendar of the month ahead. Canceled ones go underneath, most recently
+  // stopped first, since those are the ones still worth second-guessing.
+  function sortedSubscriptions() {
+    var active = [];
+    var inactive = [];
+    state.subscriptions.forEach(function(sub) {
+      (subscriptionIsActive(sub) ? active : inactive).push(sub);
+    });
+    active.sort(function(a, b) {
+      return a.day - b.day || a.note.localeCompare(b.note);
+    });
+    inactive.sort(function(a, b) {
+      return (b.canceledAt || 0) - (a.canceledAt || 0);
+    });
+    return { active: active, inactive: inactive };
+  }
+
+  function subscriptionMetaText(sub) {
+    var cadence = sub.cadenceMonths || 1;
+    var base = 'Charges on the ' + ordinal(sub.day);
+    if (cadence > 1) {
+      base += ', every ' + cadence + ' months';
+    }
+
+    if (sub.canceledAt) {
+      return base + ' \u00b7 Canceled ' + shortDate(new Date(sub.canceledAt));
+    }
+    if (!subscriptionIsActive(sub)) {
+      return base + ' \u00b7 Term ended after ' + monthKeyName(sub.endMonthKey);
+    }
+
+    var next = nextChargeDate(sub);
+    if (!next) {
+      // Still active, but nothing left to post - only reachable on the final
+      // month of a fixed term, once that month's charge has gone through.
+      return base + ' \u00b7 Last charge, ends after ' + monthKeyName(sub.endMonthKey || state.monthKey);
+    }
+
+    base += ' \u00b7 ' + (dayDifference(next, startOfToday()) === 0
+      ? 'Due today'
+      : 'Next ' + shortDate(next));
+
+    if (sub.endMonthKey) {
+      base += ', ends after ' + monthKeyName(sub.endMonthKey);
+    }
+    return base;
+  }
+
+  function subscriptionRow(sub, showCents) {
+    var active = subscriptionIsActive(sub);
+    var row = document.createElement('div');
+    row.className = 'entry-row' + (active ? '' : ' canceled');
+    row.innerHTML =
+      '<div class="entry-left">' +
+        '<div class="entry-note">' + escapeHtml(sub.note || 'Subscription') + '</div>' +
+        '<div class="entry-meta">' + escapeHtml(subscriptionMetaText(sub)) + '</div>' +
+      '</div>' +
+      '<div class="entry-right">' +
+        '<div class="entry-amount num">' + escapeHtml(fmtMoney(sub.amount, showCents)) + '</div>' +
+        '<span class="hist-pill' + (active ? ' pos' : '') + '">' + (active ? 'Active' : 'Canceled') + '</span>' +
+      '</div>';
+    row.addEventListener('click', function() { openSubEditor(sub.id); });
+    return row;
+  }
+
+  function renderSubsModal() {
+    var groups = sortedSubscriptions();
+    var total = subscriptionTotalThisPeriod();
+    var reserved = reservedThisPeriod();
+
+    document.getElementById('subsMonthlyTotal').textContent = fmt(total);
+    document.getElementById('subsActiveCount').textContent = String(groups.active.length);
+    document.getElementById('subsReserved').textContent = fmt(reserved);
+    document.getElementById('subsChips').style.display = state.subscriptions.length ? 'flex' : 'none';
+
+    var listEl = document.getElementById('subsList');
+    listEl.innerHTML = '';
+
+    if (!state.subscriptions.length) {
+      listEl.innerHTML = '<div class="empty-state">No subscriptions yet. Add one and it will be subtracted on its schedule.</div>';
+      return;
+    }
+
+    var showCents = state.subscriptions.some(function(sub) { return !isWholeDollars(sub.amount); });
+
+    function addGroup(label, subs) {
+      if (!subs.length) return;
+      var head = document.createElement('div');
+      head.className = 'sub-group-label';
+      head.textContent = label;
+      listEl.appendChild(head);
+      subs.forEach(function(sub) { listEl.appendChild(subscriptionRow(sub, showCents)); });
+    }
+
+    addGroup('Active', groups.active);
+    addGroup('Canceled', groups.inactive);
+  }
+
+  function openSubsModal() {
+    renderSubsModal();
+    subsOverlay.classList.add('show');
+  }
+
+  function closeSubsModal() {
+    subsOverlay.classList.remove('show');
+  }
+
+  // --- Subscription editor ---
+
+  // Which period a subscription entered today would first charge in. If its
+  // day has already gone by, the first charge waits for next month rather than
+  // back-charging the period in progress - the user has almost certainly
+  // already logged this month's payment by hand.
+  function firstChargeKeyFor(day) {
+    var key = state.monthKey || currentMonthKey();
+    var probe = { day: day };
+    return subscriptionDueDayStart(probe, key) >= startOfToday() ? key : nextMonthKey(key);
+  }
+
+  function readSubDay() {
+    var day = Number(document.getElementById('subDay').value);
+    if (!Number.isFinite(day) || Math.floor(day) !== day || day < 1 || day > 31) return null;
+    return day;
+  }
+
+  function updateSubDayHelp() {
+    var helpEl = document.getElementById('subDayHelp');
+    var day = readSubDay();
+    if (day === null) {
+      helpEl.textContent = '';
+      return;
+    }
+
+    var parts = [];
+    var existing = editingSubId ? findSubscription(editingSubId) : null;
+
+    if (existing) {
+      var next = nextChargeDate(existing);
+      parts.push(next ? 'Next charge ' + shortDate(next) + '.' : 'No charge left to post this month.');
+    } else {
+      var key = firstChargeKeyFor(day);
+      parts.push('First charge ' + shortDate(subscriptionDueDayStart({ day: day }, key)) + '.');
+    }
+
+    if (day > 28) {
+      parts.push('Months that end sooner will charge on their last day.');
+    }
+    helpEl.textContent = parts.join(' ');
+  }
+
+  function setDuration(kind) {
+    pendingDuration = kind;
+    var forever = document.getElementById('subDurationForever');
+    var months = document.getElementById('subDurationMonths');
+    forever.classList.toggle('selected', kind === 'indefinite');
+    months.classList.toggle('selected', kind === 'months');
+    forever.setAttribute('aria-checked', kind === 'indefinite' ? 'true' : 'false');
+    months.setAttribute('aria-checked', kind === 'months' ? 'true' : 'false');
+    document.getElementById('subMonthsRow').style.display = kind === 'months' ? 'block' : 'none';
+    updateSubMonthsHelp();
+  }
+
+  function setCadence(kind) {
+    pendingCadence = kind;
+    var monthly = document.getElementById('subCadenceMonthly');
+    var custom = document.getElementById('subCadenceCustom');
+    monthly.classList.toggle('selected', kind === 'monthly');
+    custom.classList.toggle('selected', kind === 'custom');
+    monthly.setAttribute('aria-checked', kind === 'monthly' ? 'true' : 'false');
+    custom.setAttribute('aria-checked', kind === 'custom' ? 'true' : 'false');
+    document.getElementById('subCadenceMonthsRow').style.display = kind === 'custom' ? 'block' : 'none';
+    updateSubCadenceHelp();
+    updateSubMonthsHelp();
+  }
+
+  function readSubCadence() {
+    if (pendingCadence !== 'custom') return 1;
+    var n = Number(document.getElementById('subCadenceMonths').value);
+    if (!Number.isFinite(n) || Math.floor(n) !== n || n < 2) return null;
+    return n;
+  }
+
+  // "Every 5 months" only means something once you know when it starts from -
+  // the subscription's own start month when editing, or wherever a new one
+  // would land given its post date, matching how the day field previews its
+  // own first charge.
+  function updateSubCadenceHelp() {
+    var helpEl = document.getElementById('subCadenceMonthsHelp');
+    if (pendingCadence !== 'custom') {
+      helpEl.textContent = '';
+      return;
+    }
+    var n = readSubCadence();
+    var day = readSubDay();
+    if (n === null || day === null) {
+      helpEl.textContent = '';
+      return;
+    }
+
+    var existing = editingSubId ? findSubscription(editingSubId) : null;
+    var startKey = existing ? existing.startMonthKey : firstChargeKeyFor(day);
+    var secondKey = addMonthsToKey(startKey, n);
+    helpEl.textContent = 'The next charge after this one lands in ' + monthKeyName(secondKey) + '.';
+  }
+
+  // Duration is a calendar span; cadence decides how many of the months in
+  // that span actually charge. Once both are set, "6 months" alone no longer
+  // says how many charges that is, so this spells it out - but only when
+  // it's not simply restating the month count back unchanged.
+  function updateSubMonthsHelp() {
+    var helpEl = document.getElementById('subMonthsHelp');
+    if (pendingDuration !== 'months' || pendingCadence !== 'custom') {
+      helpEl.textContent = '';
+      return;
+    }
+    var months = Number(document.getElementById('subMonths').value);
+    var cadence = readSubCadence();
+    var day = readSubDay();
+    if (!Number.isFinite(months) || Math.floor(months) !== months || months < 1 || cadence === null || day === null) {
+      helpEl.textContent = '';
+      return;
+    }
+
+    var existing = editingSubId ? findSubscription(editingSubId) : null;
+    var startKey = existing ? existing.startMonthKey : firstChargeKeyFor(day);
+    var totalCharges = Math.floor((months - 1) / cadence) + 1;
+    var endKey = addMonthsToKey(startKey, months - 1);
+    helpEl.textContent = totalCharges + (totalCharges === 1 ? ' charge' : ' charges') +
+      ' total, ending ' + monthKeyName(endKey) + '.';
+  }
+
+  function openSubEditor(id) {
+    var sub = id ? findSubscription(id) : null;
+    editingSubId = sub ? sub.id : null;
+
+    document.getElementById('subEditTitle').textContent = sub ? 'Edit subscription' : 'Add subscription';
+    document.getElementById('subEditSubtitle').textContent = sub
+      ? 'Changes apply to charges that haven\u2019t posted yet.'
+      : 'Subscriptions are automatically deducted from your remaining balance on the subscription post date.';
+
+    document.getElementById('subNote').value = sub ? sub.note : '';
+    document.getElementById('subAmount').value = sub ? sub.amount.toFixed(2) : '';
+    document.getElementById('subDay').value = sub ? sub.day : new Date().getDate();
+
+    ['subNoteError', 'subAmountError', 'subDayError', 'subCadenceMonthsError', 'subMonthsError'].forEach(function(errId) {
+      document.getElementById(errId).classList.remove('show');
+    });
+
+    if (sub && sub.cadenceMonths && sub.cadenceMonths > 1) {
+      document.getElementById('subCadenceMonths').value = sub.cadenceMonths;
+      setCadence('custom');
+    } else {
+      document.getElementById('subCadenceMonths').value = '';
+      setCadence('monthly');
+    }
+
+    if (sub && sub.endMonthKey) {
+      var termLength = monthKeyIndex(sub.endMonthKey) - monthKeyIndex(sub.startMonthKey) + 1;
+      document.getElementById('subMonths').value = Math.max(1, termLength);
+      setDuration('months');
+    } else {
+      document.getElementById('subMonths').value = '';
+      setDuration('indefinite');
+    }
+
+    var manageRow = document.getElementById('subManageRow');
+    manageRow.style.display = sub ? 'block' : 'none';
+    if (sub) {
+      var stopBtn = document.getElementById('subStopBtn');
+      var canceled = !!sub.canceledAt;
+      stopBtn.textContent = canceled ? 'Resume subscription' : 'Cancel subscription';
+      stopBtn.classList.toggle('btn-danger', !canceled);
+      stopBtn.classList.toggle('btn-secondary', canceled);
+      document.getElementById('subManageHelp').textContent = canceled
+        ? 'Resuming starts it charging again from its next day. Charges it already posted are unaffected.'
+        : 'Canceling stops future charges. Anything it already posted stays in your transactions.';
+    }
+
+    updateSubDayHelp();
+    subEditOverlay.classList.add('show');
+  }
+
+  function closeSubEditor() {
+    subEditOverlay.classList.remove('show');
+    editingSubId = null;
+  }
+
+  function saveSubscription() {
+    var noteEl = document.getElementById('subNote');
+    var note = noteEl.value.trim();
+    var noteError = document.getElementById('subNoteError');
+    if (!note) {
+      noteError.classList.add('show');
+      noteEl.focus();
+      return;
+    }
+    noteError.classList.remove('show');
+
+    var amount = parseAmount(document.getElementById('subAmount').value);
+    var amountError = document.getElementById('subAmountError');
+    if (isNaN(amount) || amount <= 0) {
+      amountError.classList.add('show');
+      return;
+    }
+    amountError.classList.remove('show');
+
+    var day = readSubDay();
+    var dayError = document.getElementById('subDayError');
+    if (day === null) {
+      dayError.classList.add('show');
+      document.getElementById('subDay').focus();
+      return;
+    }
+    dayError.classList.remove('show');
+
+    var cadence = readSubCadence();
+    var cadenceError = document.getElementById('subCadenceMonthsError');
+    if (cadence === null) {
+      cadenceError.classList.add('show');
+      document.getElementById('subCadenceMonths').focus();
+      return;
+    }
+    cadenceError.classList.remove('show');
+
+    var months = null;
+    var monthsError = document.getElementById('subMonthsError');
+    if (pendingDuration === 'months') {
+      months = Number(document.getElementById('subMonths').value);
+      if (!Number.isFinite(months) || Math.floor(months) !== months || months < 1) {
+        monthsError.classList.add('show');
+        document.getElementById('subMonths').focus();
+        return;
+      }
+    }
+    monthsError.classList.remove('show');
+
+    var rounded = Math.round(amount * 100) / 100;
+    var existing = editingSubId ? findSubscription(editingSubId) : null;
+    var isNew = !existing;
+
+    if (existing) {
+      existing.note = note;
+      existing.amount = rounded;
+      existing.day = day;
+      existing.cadenceMonths = cadence;
+      existing.endMonthKey = months ? addMonthsToKey(existing.startMonthKey, months - 1) : null;
+    } else {
+      var firstKey = firstChargeKeyFor(day);
+      state.subscriptions.push({
+        id: 's-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        amount: rounded,
+        note: note,
+        day: day,
+        startMonthKey: firstKey,
+        cadenceMonths: cadence,
+        endMonthKey: months ? addMonthsToKey(firstKey, months - 1) : null,
+        canceledAt: null,
+        // When the first charge belongs to next month, the current period is
+        // marked as handled so today's catch-up pass leaves it alone.
+        lastPostedKey: firstKey === state.monthKey ? null : state.monthKey
+      });
+    }
+
+    postDueSubscriptions();
+    save();
+    closeSubEditor();
+
+    // Adding one is a finished errand: drop the person straight back to the
+    // gauge, where the new charge or set-aside amount is already visible.
+    // Editing keeps the list open so the change can be checked in context.
+    if (isNew) {
+      closeSubsModal();
+    } else {
+      renderSubsModal();
+    }
+    render();
+  }
+
+  function askSubAction(action) {
+    var sub = editingSubId ? findSubscription(editingSubId) : null;
+    if (!sub) return;
+
+    pendingSubAction = action;
+    pendingSubActionId = sub.id;
+
+    var title = document.getElementById('subConfirmTitle');
+    var body = document.getElementById('subConfirmBody');
+    var okBtn = document.getElementById('subConfirmOk');
+
+    if (action === 'delete') {
+      title.textContent = 'Delete from your list?';
+      body.textContent = 'This removes the subscription itself. Charges it already posted stay in your transactions, so past months keep adding up correctly.';
+      okBtn.textContent = 'Delete';
+      okBtn.className = 'btn btn-destructive';
+    } else {
+      title.textContent = 'Cancel this subscription?';
+      body.textContent = 'No further charges will post. Everything it has already charged stays put.';
+      okBtn.textContent = 'Cancel it';
+      okBtn.className = 'btn btn-destructive';
+    }
+
+    document.getElementById('subConfirmName').textContent = sub.note || 'Subscription';
+    document.getElementById('subConfirmAmount').textContent = fmt(sub.amount);
+    subConfirmOverlay.classList.add('show');
+  }
+
+  function closeSubConfirm() {
+    subConfirmOverlay.classList.remove('show');
+    pendingSubAction = null;
+    pendingSubActionId = null;
+  }
+
+  function resumeSubscription(sub) {
+    sub.canceledAt = null;
+    // A term that already ran out can't just be un-paused, so resuming turns
+    // it back into an open-ended subscription rather than reviving an expiry
+    // date that is already in the past.
+    if (sub.endMonthKey && monthKeyIndex(state.monthKey) > monthKeyIndex(sub.endMonthKey)) {
+      sub.endMonthKey = null;
+    }
+    // Don't back-charge the period it was canceled in if its day has passed.
+    if (state.monthKey && !alreadyPostedFor(sub, state.monthKey) &&
+        startOfToday() > subscriptionDueDayStart(sub, state.monthKey)) {
+      sub.lastPostedKey = state.monthKey;
+    }
+    postDueSubscriptions();
+  }
+
+  document.getElementById('openSubsTop').addEventListener('click', openSubsModal);
+  document.getElementById('subsClose').addEventListener('click', closeSubsModal);
+  subsOverlay.addEventListener('click', function(ev) {
+    if (ev.target === subsOverlay) closeSubsModal();
+  });
+  document.getElementById('openSubsFromSettings').addEventListener('click', function() {
+    closeSettings();
+    openSubsModal();
+  });
+  document.getElementById('subsAddBtn').addEventListener('click', function() { openSubEditor(null); });
+
+  document.getElementById('subEditCancel').addEventListener('click', closeSubEditor);
+  subEditOverlay.addEventListener('click', function(ev) {
+    if (ev.target === subEditOverlay) closeSubEditor();
+  });
+  document.getElementById('subEditSave').addEventListener('click', saveSubscription);
+  document.getElementById('subDay').addEventListener('input', function() {
+    updateSubDayHelp();
+    updateSubCadenceHelp();
+    updateSubMonthsHelp();
+  });
+  document.getElementById('subDurationForever').addEventListener('click', function() { setDuration('indefinite'); });
+  document.getElementById('subDurationMonths').addEventListener('click', function() {
+    setDuration('months');
+    document.getElementById('subMonths').focus();
+  });
+  document.getElementById('subMonths').addEventListener('input', updateSubMonthsHelp);
+
+  document.getElementById('subCadenceMonthly').addEventListener('click', function() { setCadence('monthly'); });
+  document.getElementById('subCadenceCustom').addEventListener('click', function() {
+    setCadence('custom');
+    document.getElementById('subCadenceMonths').focus();
+  });
+  document.getElementById('subCadenceMonths').addEventListener('input', function() {
+    updateSubCadenceHelp();
+    updateSubMonthsHelp();
+  });
+
+  document.getElementById('subStopBtn').addEventListener('click', function() {
+    var sub = editingSubId ? findSubscription(editingSubId) : null;
+    if (!sub) return;
+    // Resuming is harmless and reversible, so it doesn't need a confirmation.
+    if (sub.canceledAt) {
+      resumeSubscription(sub);
+      save();
+      closeSubEditor();
+      renderSubsModal();
+      render();
+      return;
+    }
+    askSubAction('cancel');
+  });
+
+  document.getElementById('subDeleteBtn').addEventListener('click', function() { askSubAction('delete'); });
+  document.getElementById('subConfirmCancel').addEventListener('click', closeSubConfirm);
+  subConfirmOverlay.addEventListener('click', function(ev) {
+    if (ev.target === subConfirmOverlay) closeSubConfirm();
+  });
+
+  document.getElementById('subConfirmOk').addEventListener('click', function() {
+    var sub = pendingSubActionId ? findSubscription(pendingSubActionId) : null;
+    var action = pendingSubAction;
+    closeSubConfirm();
+    if (!sub) return;
+
+    if (action === 'delete') {
+      state.subscriptions = state.subscriptions.filter(function(s) { return s.id !== sub.id; });
+    } else {
+      sub.canceledAt = Date.now();
+    }
+
+    save();
+    closeSubEditor();
+    renderSubsModal();
+    render();
+  });
+
+  // The app lives on a home screen and can sit open for days, so a date change
+  // that happens while it is backgrounded still has to bring its charges in
+  // when the user comes back.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    if (state.budget === null) return;
+    if (postDueSubscriptions()) {
+      save();
+      render();
+      if (subsOverlay.classList.contains('show')) renderSubsModal();
+    }
   });
 
   // --- Backup / restore ---
@@ -2679,6 +4026,13 @@
           (state.monthKey !== state.transitionUndo.startedMonthKey || hasUserTransactions())) {
         state.transitionUndo = null;
       }
+      // A backup restored onto a new device may be days or weeks old, so any
+      // charges that came due in the meantime are brought in before the first
+      // render rather than showing a balance that is briefly too optimistic.
+      // A years-old backup could also be carrying subscriptions canceled long
+      // enough ago that they'd already have been swept on this device.
+      postDueSubscriptions();
+      purgeStaleCanceledSubscriptions();
       render();
     } catch (err) {
       state = previous;
@@ -2877,6 +4231,9 @@
       case 'historyOverlay': return closeHistoryModal;
       case 'editOverlay': return closeEditModal;
       case 'deleteOverlay': return closeDeleteModal;
+      case 'subsOverlay': return closeSubsModal;
+      case 'subEditOverlay': return closeSubEditor;
+      case 'subConfirmOverlay': return closeSubConfirm;
       case 'backupTextOverlay': return closeBackupText;
       case 'restoreTextOverlay': return closeRestoreText;
       default: return null;
@@ -2960,7 +4317,8 @@
       var hadControllerAtLaunch = !!navigator.serviceWorker.controller;
 
       function hasUnsavedInput() {
-        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editDay', 'editAmount', 'editNote'];
+        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editDay', 'editAmount', 'editNote',
+          'subNote', 'subAmount', 'subDay', 'subMonths'];
         return ids.some(function(id) {
           var el = document.getElementById(id);
           return el && el.value && el.value.trim() !== '';
@@ -3043,6 +4401,9 @@
       state.monthKey = currentMonthKey();
       save();
     }
+
+    if (postDueSubscriptions()) save();
+    if (purgeStaleCanceledSubscriptions()) save();
 
     render();
   } catch (err) {
