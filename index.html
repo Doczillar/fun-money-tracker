@@ -3806,8 +3806,15 @@
   var restoreTextArea = document.getElementById('restoreTextArea');
   var restoreError = document.getElementById('restoreError');
 
+  function pad2(n) {
+    return (n < 10 ? '0' : '') + n;
+  }
+
+  // Day included, not just year-month, so exporting more than once in the
+  // same month doesn't produce two files with an identical name.
   function backupFileName() {
-    return 'fun-money-backup-' + currentMonthKey() + '.json';
+    var d = new Date();
+    return 'fun-money-backup-' + d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + '.json';
   }
 
   function backupJSON() {
