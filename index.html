@@ -527,6 +527,7 @@
   .sub-list {
     max-height: 44vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     margin: 0 -2px;
     padding: 0 2px;
   }
@@ -605,6 +606,7 @@
   .hist-list {
     max-height: 48vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     margin-bottom: 0;
   }
   .hist-list .entry-row {
@@ -613,13 +615,24 @@
   }
   .hist-list .entry-row:active { background: var(--surface-raised); }
 
+  /* Vertical centering deliberately does NOT live here as align-items:center
+     - a flex container that's both centering and scrollable has a well-known
+     quirk where content before the centered position becomes unreachable:
+     the scrollable area only extends past the item's far edge, not its near
+     one, so a modal taller than the viewport gets its top pushed above the
+     screen with no way to scroll up to it. align-items:flex-start avoids
+     that; .modal below uses margin:auto to recover the same centered look
+     for a modal that fits, without the scroll-locking side effect for one
+     that doesn't. */
   .modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.55);
     display: none;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 20px;
     z-index: 10;
   }
@@ -629,6 +642,8 @@
     background: var(--surface);
     width: 100%;
     max-width: 380px;
+    flex-shrink: 0;
+    margin: auto 0;
     border-radius: 20px;
     padding: 24px 20px;
     position: relative;
@@ -708,13 +723,25 @@
 
   #resetSection label {
     display: block;
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
   }
   #resetSection .btn {
     font-size: 13px;
     padding: 12px 8px;
+  }
+
+  /* Section headers within a modal - one step down from the modal's own h3,
+     but bolder and ink-colored rather than the muted, smaller styling a
+     plain field label gets. .modal label already claims that specificity,
+     so this needs to out-rank it rather than just add a class. */
+  .modal label.section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
   }
 
   .divider {
@@ -1093,12 +1120,6 @@
     </button>
     <h3 id="modalTitle">Set your fun money</h3>
     <p id="modalSubtitle">How much can you spend on fun stuff this month?</p>
-    <label for="budgetInput">Base fun money per month</label>
-    <input class="amount-input" id="budgetInput" type="text" inputmode="decimal" placeholder="$400.00" style="width:100%">
-    <div class="modal-btn-row">
-      <button class="btn btn-primary" id="saveSettings">Save</button>
-    </div>
-    <div class="divider" id="resetDivider" style="display:none"></div>
     <div id="resetSection" style="display:none">
       <label>Budget period</label>
       <p class="settings-help" id="periodActionHelp"></p>
@@ -1109,17 +1130,16 @@
         <button class="btn btn-danger period-action" id="undoMonthSettingsBtn">Undo new month</button>
       </div>
     </div>
-    <div class="divider" id="subsSettingsDivider" style="display:none"></div>
-    <div id="subsSettingsSection" style="display:none">
-      <label>Subscriptions</label>
-      <p class="settings-help" id="subsSettingsHelp"></p>
-      <div class="modal-btn-row">
-        <button class="btn btn-secondary period-action" id="openSubsFromSettings">Manage subscriptions</button>
-      </div>
+    <div class="divider" id="resetDivider" style="display:none"></div>
+    <label for="budgetInput" class="section-title">Base fun money per month</label>
+    <p class="settings-help" id="baseAmountHelp" style="display:none">Changing the base amount applies to this month and future months.</p>
+    <input class="amount-input" id="budgetInput" type="text" inputmode="decimal" placeholder="$400.00" style="width:100%">
+    <div class="modal-btn-row">
+      <button class="btn btn-primary" id="saveSettings">Save</button>
     </div>
     <div class="divider"></div>
     <div>
-      <label>Backup (recommended)</label>
+      <label class="section-title">Backup (recommended)</label>
       <p class="settings-help">Export saves everything in this app. Move that backup to another device and import it there.</p>
       <div class="modal-btn-row">
         <button class="btn btn-secondary" id="exportBtn">Export</button>
@@ -1231,7 +1251,6 @@
     <div class="hist-chips" id="subsChips">
       <div class="hist-chip"><div class="k">This month</div><div class="v num" id="subsMonthlyTotal">$0.00</div></div>
       <div class="hist-chip"><div class="k">Active</div><div class="v num" id="subsActiveCount">0</div></div>
-      <div class="hist-chip"><div class="k">Still to post</div><div class="v num" id="subsReserved">$0.00</div></div>
     </div>
     <div class="sub-list" id="subsList"></div>
     <div class="modal-btn-row">
@@ -2684,19 +2703,24 @@
 
   function openSettings() {
     var isFirstRun = state.budget === null;
-    document.getElementById('modalTitle').textContent = isFirstRun ? 'Set your fun money' : 'Settings';
+    document.getElementById('modalTitle').textContent = isFirstRun ? 'Set your fun money' : '';
+    // No generic "Settings" heading once there's a budget - the sections
+    // below (Budget period, Base fun money per month, Backup) each carry
+    // their own title now, so a top label is redundant.
+    document.getElementById('modalTitle').style.display = isFirstRun ? 'block' : 'none';
     document.getElementById('modalSubtitle').textContent = isFirstRun
       ? 'Set your base fun money per month. You can change it later.'
-      : 'Changing the base amount applies to this month and future months.';
+      : '';
+    document.getElementById('modalSubtitle').style.display = isFirstRun ? 'block' : 'none';
+    // Same line as before, just living under the field it actually describes
+    // now instead of doubling as the whole modal's subtitle.
+    document.getElementById('baseAmountHelp').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('budgetInput').value = state.baseBudget ? state.baseBudget.toFixed(2) : '';
     document.getElementById('resetDivider').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('resetSection').style.display = isFirstRun ? 'none' : 'block';
     document.getElementById('cancelSettings').style.display = isFirstRun ? 'none' : 'flex';
-    document.getElementById('subsSettingsDivider').style.display = isFirstRun ? 'none' : 'block';
-    document.getElementById('subsSettingsSection').style.display = isFirstRun ? 'none' : 'block';
     if (!isFirstRun) {
       updatePeriodSettings();
-      updateSubsSettings();
     }
     document.getElementById('buildStamp').textContent = 'Build ' + APP_BUILD;
     overlay.classList.add('show');
@@ -3252,22 +3276,6 @@
   var pendingSubAction = null;
   var pendingSubActionId = null;
 
-  function updateSubsSettings() {
-    var active = state.subscriptions.filter(subscriptionIsActive).length;
-    var total = subscriptionTotalThisPeriod();
-    var help = document.getElementById('subsSettingsHelp');
-    var btn = document.getElementById('openSubsFromSettings');
-
-    if (!state.subscriptions.length) {
-      help.textContent = 'Record a recurring charge once and it will be subtracted automatically on its schedule.';
-      btn.textContent = 'Add a subscription';
-    } else {
-      help.textContent = active + (active === 1 ? ' active subscription' : ' active subscriptions') +
-        (total >= 0.005 ? ', ' + fmtCompact(total) + ' this month.' : '.');
-      btn.textContent = 'Manage subscriptions';
-    }
-  }
-
   // Active first, ordered by the day they charge, so the list reads as a
   // calendar of the month ahead. Canceled ones go underneath, most recently
   // stopped first, since those are the ones still worth second-guessing.
@@ -3337,11 +3345,9 @@
   function renderSubsModal() {
     var groups = sortedSubscriptions();
     var total = subscriptionTotalThisPeriod();
-    var reserved = reservedThisPeriod();
 
     document.getElementById('subsMonthlyTotal').textContent = fmt(total);
     document.getElementById('subsActiveCount').textContent = String(groups.active.length);
-    document.getElementById('subsReserved').textContent = fmt(reserved);
     document.getElementById('subsChips').style.display = state.subscriptions.length ? 'flex' : 'none';
 
     var listEl = document.getElementById('subsList');
@@ -3705,10 +3711,6 @@
   document.getElementById('subsClose').addEventListener('click', closeSubsModal);
   subsOverlay.addEventListener('click', function(ev) {
     if (ev.target === subsOverlay) closeSubsModal();
-  });
-  document.getElementById('openSubsFromSettings').addEventListener('click', function() {
-    closeSettings();
-    openSubsModal();
   });
   document.getElementById('subsAddBtn').addEventListener('click', function() { openSubEditor(null); });
 
@@ -4233,6 +4235,40 @@
     }
   }
 
+  // --- Body scroll lock -----------------------------------------------------
+  // .modal-overlay is position:fixed, but the page underneath it is still in
+  // normal flow and free to scroll. A modal with little content of its own
+  // (a short subscriptions or history list) has nowhere for a drag to go, so
+  // the gesture falls through the fixed overlay to the transactions list
+  // behind it - the background scrolls while the modal itself stays put.
+  // Taking the body out of flow while any overlay is open closes that gap.
+  // overflow:hidden alone doesn't do it on iOS, which still allows
+  // momentum-scrolling a body through a fixed overlay above it; position
+  // does.
+  var scrollLockY = null;
+
+  function lockBodyScroll() {
+    if (scrollLockY !== null) return;
+    scrollLockY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = -scrollLockY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+
+  function unlockBodyScroll() {
+    if (scrollLockY === null) return;
+    var y = scrollLockY;
+    scrollLockY = null;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, y);
+  }
+
   // --- Modal focus and keyboard handling ----------------------------------
   var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -4326,6 +4362,16 @@
           }
         }
       });
+
+      // One lock shared across every overlay rather than a pair of calls per
+      // mutation - two modals can be open at once (subsOverlay behind
+      // subEditOverlay), and the body should only unlock once the last one
+      // of them has closed.
+      if (document.querySelectorAll('.modal-overlay.show').length) {
+        lockBodyScroll();
+      } else {
+        unlockBodyScroll();
+      }
     });
     Array.prototype.forEach.call(document.querySelectorAll('.modal-overlay'), function(el) {
       el.__overlayShown = el.classList.contains('show');
