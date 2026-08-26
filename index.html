@@ -143,70 +143,37 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 2px 0 4px;
+    padding: 8px 0 4px;
   }
 
-  .bar-track {
-    width: 100%;
-    height: 20px;
-    border-radius: 999px;
-    background: var(--gauge-track);
-    /* overflow:hidden does the rounding work a stroke linecap used to need
-       fixing up by hand: both ends of the fill inherit the track's rounded
-       corners for free, and the seam between fill and reserve is just two
-       rects meeting - no cap math, no special-casing an edge-to-edge case,
-       nothing that can render inconsistently across browsers. */
-    overflow: hidden;
+  /* ---- Ring gauge ---- */
+  .ring-track {
+    width: 220px;
+    height: 220px;
+    flex-shrink: 0;
+    /* SVG sits on top; the centre text is absolutely positioned over it */
     position: relative;
-    margin-top: 20px;
   }
-
-  .bar-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 0%;
-    background: var(--mint);
-    transition: width 0.5s ease, background-color 0.3s ease;
+  .ring-track svg {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
-
-  /* Three reference marks at the quarters (25/50/75%), evenly spaced so the
-     bar reads as a graduated scale rather than a plain colour block even
-     when it's completely full - an earlier version at 1/3/1/2/2/3 packed all
-     three into the middle third of the bar, which looked clumped rather
-     than like a scale. Two of the three line up with a colour change (1/2 =
-     gold, 1/4 = coral - see render()); the 75% mark is a plain reference
-     point with no colour change of its own. Static positions, not
-     JS-driven: unlike the fill and reserve, these never move. */
-  .bar-tick {
+  /* Value arc and reserve arc: no CSS transitions - the JS RAF loop
+     drives all arc and cap-dot positions from a single eased value,
+     so everything moves in perfect unison. */
+  #ringValue, #ringReserve {
+    transition: stroke 0.3s ease;
+  }
+  /* Centre text sits over the SVG */
+  .ring-center {
     position: absolute;
-    top: 3px;
-    bottom: 3px;
-    width: 1.5px;
-    background: var(--bg);
-    opacity: 0.55;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
-  }
-
-  /* The reserved slice: the part of the bar already promised to a
-     subscription still to post this month. Always a neutral gray
-     (var(--muted), set in JS), never the mint/gold/coral of the fill - the
-     centre figure has already subtracted this money out, so the slice marks
-     where that subtraction came from rather than restating money that's
-     still available. */
-  .bar-reserve {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0%;
-    width: 0%;
-    background: var(--muted);
-    transition: width 0.5s ease, left 0.5s ease;
-    display: none;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .bar-fill, .bar-reserve { transition: none; }
   }
 
   .reserve-note {
@@ -279,6 +246,7 @@
     color: var(--muted);
     margin-top: 4px;
   }
+  .balance-visual .of.over { color: var(--coral); }
 
   .status-warning { color: var(--coral); }
 
@@ -978,7 +946,7 @@
   @media (min-width: 760px) and (min-height: 520px) and (max-height: 740px) and (min-aspect-ratio: 1/1) {
     header { margin-bottom: 14px; }
     .balance-card { padding: 20px 18px 18px; margin-bottom: 16px; }
-    .bar-track { max-width: 240px; height: 18px; }
+    .ring-track { width: 180px; height: 180px; }
     .balance-visual .amount { font-size: 26px; }
     .entry-form { padding: 14px; }
   }
@@ -1069,14 +1037,34 @@
 
   <div class="balance-card">
     <div class="balance-visual" role="status" aria-live="polite" aria-atomic="true">
-      <div class="amount num" id="remainingAmount">$0.00</div>
-      <div class="of" id="budgetOf">of $0.00</div>
-      <div class="bar-track">
-        <div class="bar-fill" id="barFill"></div>
-        <div class="bar-reserve" id="barReserve"></div>
-        <div class="bar-tick" style="left:75%" aria-hidden="true"></div>
-        <div class="bar-tick" style="left:50%" aria-hidden="true"></div>
-        <div class="bar-tick" style="left:25%" aria-hidden="true"></div>
+      <div class="ring-track">
+        <svg viewBox="0 0 220 220" aria-hidden="true">
+          <!-- Empty track -->
+          <circle cx="110" cy="110" r="88" fill="none" stroke="var(--gauge-track)" stroke-width="16"/>
+          <!-- Reserved arc: gray tail, drawn under the value arc.
+               pathLength="1" lets dashoffset be a 0-1 fraction directly. -->
+          <circle id="ringReserve" cx="110" cy="110" r="88" fill="none"
+                  stroke="var(--muted)" stroke-width="16" stroke-linecap="butt"
+                  pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"
+                  transform="rotate(-90 110 110)"/>
+          <!-- Value arc: spendable money, colour-coded mint/gold/coral.
+               Drawn on top; butt caps on both ends so the green/gray seam
+               is always a sharp radial line, never a rounded overlap. -->
+          <circle id="ringValue" cx="110" cy="110" r="88" fill="none"
+                  stroke="var(--mint)" stroke-width="16" stroke-linecap="butt"
+                  pathLength="1" stroke-dasharray="1" stroke-dashoffset="0"
+                  transform="rotate(-90 110 110)"/>
+          <!-- Rounded cap dots: one at the fixed 12-o'clock start, one at the
+               moving leading edge. Both hidden when the ring is fully closed
+               (ratio >= ~1) so the green/gray seam stays flat at 100% full.
+               Positioned and coloured entirely by renderRing() in JS. -->
+          <circle id="ringCapStart" r="8"/>
+          <circle id="ringCapEnd" r="8"/>
+        </svg>
+        <div class="ring-center">
+          <div class="amount num" id="remainingAmount">$0</div>
+          <div class="of" id="budgetOf">remaining</div>
+        </div>
       </div>
     </div>
     <div class="reserve-note" id="reserveNote">
@@ -2318,28 +2306,24 @@
     var gaugeMax = Math.max(state.baseBudget || 0, budget, 0.01);
     var ratio = Math.max(0, Math.min(1, remaining / gaugeMax));
 
-    var barFill = document.getElementById('barFill');
-    barFill.style.width = (ratio * 100) + '%';
-
     // The figure the person actually sees treats money already promised to a
     // subscription as gone, even before it posts - that's the whole point of
-    // showing it gray on the bar. This is purely a display-time adjustment:
+    // showing it gray on the ring. This is purely a display-time adjustment:
     // computeRemaining() itself is untouched, so the ledger, month-close, and
     // rollover math all still work from the real (unposted-subscriptions-
     // included) balance.
     var trueRemaining = Math.round((remaining - reservedThisPeriod()) * 100) / 100;
 
     var gaugeColor;
-    // Both thresholds now land on a tick: gold at the middle mark (1/2),
-    // coral at the lower mark (1/4).
-    if (trueRemaining < (state.baseBudget || budget) / 4) {
+    // Gold at 1/3 left, coral at 1/5 left - both noticeably low thresholds
+    // that give clear warning without triggering too early.
+    if (trueRemaining < (state.baseBudget || budget) / 5) {
       gaugeColor = 'var(--coral)';
-    } else if (trueRemaining < (state.baseBudget || budget) / 2) {
+    } else if (trueRemaining < (state.baseBudget || budget) / 3) {
       gaugeColor = 'var(--gold)';
     } else {
       gaugeColor = 'var(--mint)';
     }
-    barFill.style.background = gaugeColor;
 
     var amountEl = document.getElementById('remainingAmount');
     // The gauge decides on its own value alone - independent of whether the
@@ -2347,57 +2331,188 @@
     amountEl.textContent = fmtMoney(trueRemaining, false);
     amountEl.classList.toggle('status-warning', trueRemaining < 0);
 
-    document.getElementById('budgetOf').textContent = trueRemaining < 0
+    var budgetOfEl = document.getElementById('budgetOf');
+    budgetOfEl.classList.toggle('over', trueRemaining < 0);
+    budgetOfEl.textContent = trueRemaining < 0
       ? 'over this month\u2019s budget'
       : 'remaining';
 
-    renderReserve(remaining, ratio, gaugeMax);
+    renderReserve(remaining, ratio, gaugeMax, gaugeColor);
     renderEntries();
   }
 
-  // The gray slice on the bar: the part already promised to a subscription
-  // still to post this month. Unlike the fill, it isn't colour-coded to the
-  // mint/gold/coral status - it's deliberately neutral, so it reads at a
-  // glance as money that isn't really available, the same way the unfilled
-  // track does. The centre figure agrees: it already has this amount
-  // subtracted out, so the gray slice is showing where that subtraction
-  // came from, not restating money the person still has.
-  //
-  // Unlike the ring this replaced, there's no cap-dot or edge-case math
-  // needed here: two rects inside an overflow:hidden pill naturally get
-  // their rounding from the container, and a seam between them is just
-  // where one rect ends and the next begins - nothing to special-case even
-  // when they fill the entire bar.
-  function renderReserve(remaining, ratio, gaugeMax) {
-    var reserved = reservedThisPeriod();
-    var barReserve = document.getElementById('barReserve');
-    var note = document.getElementById('reserveNote');
+  // ---- Ring animation state ------------------------------------------------
+  // All arc and cap-dot geometry is driven by a single requestAnimationFrame
+  // loop using a fixed-duration ease (matching what CSS transition:0.5s ease
+  // would do), so depleting and refilling feel identical and symmetrical.
+  // The green and gray fractions are each interpolated DIRECTLY between
+  // their previous and new values using the same eased progress - never
+  // derived from a ratio, which is direction-dependent (a current/target
+  // ratio clamps at 1 whenever current > target, which froze depletion at
+  // its final frame). Direct interpolation works identically both ways,
+  // and both arcs plus both cap dots still move in perfect unison.
+  var RING_CX = 110, RING_CY = 110, RING_R = 88;
+  var RING_DURATION = 500; // ms - matches the old CSS transition duration
+  var RING_SNAP = 0.0002;  // treat differences below this as "already there"
+  var _colorFracFrom = 0, _colorFracCur = 0, _colorFracTgt = 0;
+  var _reserveFracFrom = 0, _reserveFracCur = 0, _reserveFracTgt = 0;
+  var _ringStart = 0;   // timestamp when the current transition began
+  var _gaugeColor = 'var(--mint)';
+  var _ringRAF = null;
+  var _reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Cached once at startup - these elements never change
+  var _elRingValue, _elRingReserve, _elCapStart, _elCapEnd;
 
-    if (reserved < 0.005) {
-      barReserve.style.display = 'none';
-      note.classList.remove('show');
+  // CSS "ease" cubic-bezier(0.25, 0.1, 0.25, 1.0) approximated with a
+  // smoothstep that is close enough to be indistinguishable at this scale.
+  function _easeInOut(t) { return t * t * (3 - 2 * t); }
+
+  function ringPoint(deg) {
+    var rad = (deg - 90) * Math.PI / 180;
+    return { x: RING_CX + RING_R * Math.cos(rad), y: RING_CY + RING_R * Math.sin(rad) };
+  }
+  function placeCapDot(el, deg, color, show) {
+    var p = ringPoint(deg);
+    el.setAttribute('cx', p.x);
+    el.setAttribute('cy', p.y);
+    el.style.fill = color;
+    el.style.display = show ? '' : 'none';
+  }
+
+  // Paint one frame from the two animated fractions directly.
+  function _ringPaint(colorFrac, reserveFrac) {
+    var UNDERLAP = 0.006;      // interior seam: pulls gray's leading edge back under green
+    var CLOSE_OVERLAP = 0.006; // closing seam: lets gray's tail wrap just past 12 o'clock,
+                               // underneath green's start, so the closure point is backed
+                               // by gray instead of the dark track.
+    var GRAY = 'var(--muted)';
+
+    var bothSegments = colorFrac > 0.001 && reserveFrac > 0.001;
+    var underlap = bothSegments ? UNDERLAP : 0;
+
+    // A single arc covering (essentially) the whole ring is drawn WITHOUT
+    // the dash trick: a plain continuous circle stroke has no start or end
+    // at all, so it cannot show a seam. (Do NOT try to extend the dash past
+    // a full loop instead - the dash pattern doesn't wrap on a closed path;
+    // a length > 1 pushes the offset negative, which SHIFTS the drawn
+    // window and cuts a visible notch at 12 o'clock.)
+    var greenSolid = colorFrac >= 0.999 && reserveFrac <= 0.001;
+    var graySolid  = reserveFrac >= 0.999 && colorFrac <= 0.001;
+
+    // When green + gray close the loop together, gray's tail gets a little
+    // extra length so it wraps past 12 o'clock underneath green's start.
+    // Green paints on top, so no background can peek through at the closure
+    // and the visible gray-to-green cut stays a single sharp edge. Gray's
+    // own drawn window stays well under a full loop here, so this never
+    // hits the negative-offset problem above.
+    var grayCloses = (colorFrac + reserveFrac) >= 0.999 && reserveFrac > 0.001 && !graySolid;
+    var grayLen = reserveFrac + underlap + (grayCloses ? CLOSE_OVERLAP : 0);
+
+    var ringValue   = _elRingValue   || (_elRingValue   = document.getElementById('ringValue'));
+    var ringReserve = _elRingReserve || (_elRingReserve = document.getElementById('ringReserve'));
+    var capStart    = _elCapStart    || (_elCapStart    = document.getElementById('ringCapStart'));
+    var capEnd      = _elCapEnd      || (_elCapEnd      = document.getElementById('ringCapEnd'));
+
+    // Value arc
+    ringValue.style.strokeDasharray  = greenSolid ? 'none' : '1';
+    ringValue.style.strokeDashoffset = greenSolid ? 0 : (1 - colorFrac);
+    ringValue.setAttribute('stroke', _gaugeColor);
+    ringValue.style.display = colorFrac > 0.001 ? '' : 'none';
+
+    // Reserve arc: rotation and length updated together in the same frame
+    ringReserve.style.strokeDasharray  = graySolid ? 'none' : '1';
+    ringReserve.style.strokeDashoffset = graySolid ? 0 : (1 - grayLen);
+    ringReserve.setAttribute('transform',
+      'rotate(' + (-90 + colorFrac * 360 - underlap * 360) + ' ' + RING_CX + ' ' + RING_CY + ')');
+    ringReserve.style.display = reserveFrac > 0.001 ? '' : 'none';
+
+    // Cap dots: only where filled arc meets empty track.
+    // Both are hidden when the ring is fully closed so the seam stays flat.
+    var animTotal = colorFrac + reserveFrac;
+    var showCaps  = animTotal > 0.001 && animTotal < 0.999;
+    var startColor = _gaugeColor;
+    var endColor   = reserveFrac > 0.001 ? GRAY : _gaugeColor;
+    placeCapDot(capStart, 0,               startColor, showCaps);
+    placeCapDot(capEnd,   animTotal * 360,  endColor,  showCaps);
+  }
+
+  function _ringTick(now) {
+    var progress = Math.min(1, (now - _ringStart) / RING_DURATION);
+    var e = _easeInOut(progress);
+    _colorFracCur   = _colorFracFrom   + (_colorFracTgt   - _colorFracFrom)   * e;
+    _reserveFracCur = _reserveFracFrom + (_reserveFracTgt - _reserveFracFrom) * e;
+    _ringPaint(_colorFracCur, _reserveFracCur);
+    if (progress < 1) {
+      _ringRAF = requestAnimationFrame(_ringTick);
+    } else {
+      _colorFracCur   = _colorFracTgt;
+      _reserveFracCur = _reserveFracTgt;
+      _ringRAF = null;
+    }
+  }
+
+  // Called by renderReserve() with the new target fractions.
+  // If a transition is already running, it starts fresh from wherever the
+  // ring currently is, so interruptions never snap or jump.
+  function _ringSetTarget(colorFrac, reserveFrac, gaugeColor) {
+    _gaugeColor = gaugeColor;
+    var noChange = Math.abs(colorFrac   - _colorFracCur)   < RING_SNAP &&
+                   Math.abs(reserveFrac - _reserveFracCur) < RING_SNAP;
+    _colorFracTgt   = colorFrac;
+    _reserveFracTgt = reserveFrac;
+
+    if (_reduceMotion || noChange) {
+      if (_ringRAF) { cancelAnimationFrame(_ringRAF); _ringRAF = null; }
+      _colorFracCur   = colorFrac;
+      _reserveFracCur = reserveFrac;
+      // Repaint even on noChange so a colour-only update still lands.
+      _ringPaint(_colorFracCur, _reserveFracCur);
       return;
     }
 
-    if (remaining > 0) {
-      // Capped at the fill that actually exists: when more is owed than is
-      // left, the whole visible bar is spoken for.
-      var reserveRatio = Math.max(0, Math.min(ratio, reserved / gaugeMax));
-      barReserve.style.left = ((ratio - reserveRatio) * 100) + '%';
-      barReserve.style.width = (reserveRatio * 100) + '%';
-      barReserve.style.display = 'block';
-    } else {
-      // Nothing left to carve a slice out of - the note carries the message.
-      barReserve.style.display = 'none';
+    // Start a fresh transition from the currently painted position.
+    _colorFracFrom   = _colorFracCur;
+    _reserveFracFrom = _reserveFracCur;
+    _ringStart = performance.now();
+    if (_ringRAF) cancelAnimationFrame(_ringRAF);
+    _ringRAF = requestAnimationFrame(_ringTick);
+  }
+  // ---- End ring animation state --------------------------------------------
+
+  // The gray tail on the ring: the part already promised to a subscription
+  // still to post this month. Unlike the value arc, it isn't colour-coded -
+  // it's deliberately neutral, so it reads at a glance as money that isn't
+  // really available. The centre figure agrees: it already has this amount
+  // subtracted out, so the gray slice shows where that subtraction came from,
+  // not restating money the person still has.
+  function renderReserve(remaining, ratio, gaugeMax, gaugeColor) {
+    var reserved = reservedThisPeriod();
+    var note = document.getElementById('reserveNote');
+
+    // Value arc fraction: the spendable portion (trueRemaining / gaugeMax),
+    // clamped to [0, 1].
+    var trueRemaining = Math.round((remaining - reserved) * 100) / 100;
+    var colorFrac = Math.max(0, Math.min(1, trueRemaining / gaugeMax));
+
+    // Reserve arc fraction: what's left of ratio after the value arc, capped
+    // at the actual reserved proportion so it never overflows.
+    var reserveFrac = 0;
+    if (reserved >= 0.005 && remaining > 0) {
+      reserveFrac = Math.max(0, Math.min(ratio - colorFrac, reserved / gaugeMax));
     }
 
-    // Neutral regardless of band - deliberately not mint/gold/coral, so it
-    // never reads as "part of your available money," just "spoken for."
-    var GRAY = 'var(--muted)';
-    document.getElementById('reserveDot').style.background = GRAY;
+    // Hand off to the RAF loop - it paints every frame until settled.
+    _ringSetTarget(colorFrac, reserveFrac, gaugeColor);
+
+    // Reserve note below the ring.
+    if (reserved < 0.005) {
+      note.classList.remove('show');
+      return;
+    }
+    document.getElementById('reserveDot').style.background = 'var(--muted)';
     document.getElementById('reserveNoteText').innerHTML =
       '<strong class="num">' + escapeHtml(fmtMoney(reserved, false)) +
-      '</strong> set aside for upcoming subscriptions';
+      '</strong> reserved for upcoming subscriptions';
     note.classList.add('show');
   }
 
@@ -2622,7 +2737,9 @@
     var floatEl = document.createElement('div');
     floatEl.className = 'float-amount ' + entryType + ' num';
     floatEl.textContent = (entryType === 'added' ? '+' : '\u2212') + '$' + entryAmount.toFixed(2);
-    var wrap = document.querySelector('.balance-visual');
+    // Append to .ring-track (position:relative) so the float centres over
+    // the ring face rather than the full balance-visual column.
+    var wrap = document.querySelector('.ring-track');
     wrap.appendChild(floatEl);
     var removed = false;
     function removeFloat() {
