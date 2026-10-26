@@ -258,10 +258,43 @@
   }
 
   .form-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 48px;
     gap: clamp(6px, 2vw, 10px);
     margin-bottom: 10px;
   }
+  .form-row > * { min-width: 0; width: 100%; }
+  .form-row > .note-input { min-width: 0; margin-bottom: 0; }
+  .entry-options { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; }
+  .entry-option-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .entry-options .type-toggle { height: 48px; }
+  .entry-form { padding: 12px; }
+  .entry-form .add-btn { min-height: 48px; }
+
+  .merchant-choices {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .merchant-choice {
+    border: 1px solid #52606a;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    min-height: 48px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 clamp(3px, 1vw, 10px);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .merchant-choice.active { border-color: var(--gold); background: rgba(232, 185, 77, 0.10); color: var(--gold); }
+  .merchant-choice:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
+  .edit-merchant-field { margin-top: 12px; }
 
   .amount-input {
     flex: 1 1 0;
@@ -287,8 +320,9 @@
     border: none;
     background: var(--surface-raised);
     color: var(--muted);
-    padding: 0 clamp(8px, 2vw, 14px);
-    min-width: clamp(68px, 21vw, 88px);
+    padding: 0 clamp(3px, 1vw, 10px);
+    flex: 1 1 0;
+    min-width: 0;
     text-align: center;
     font-size: clamp(12px, 3.5vw, 14px);
     font-weight: 600;
@@ -410,8 +444,7 @@
   .entry-note { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .entry-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-  /* Marks a transaction the app posted from a subscription. The row itself
-     stays fully editable - only its provenance is different. */
+  /* Compact metadata tags for subscriptions and frequently used merchants. */
   .entry-tag {
     display: inline-block;
     font-size: 10px;
@@ -425,6 +458,15 @@
     margin-left: 6px;
     vertical-align: 1px;
   }
+  .entry-tag.merchant-tag { display:inline-flex; align-items:center; justify-content:center; width:64px; height:28px; padding:2px 6px; vertical-align:middle; text-transform:none; background:#fff; letter-spacing:0; overflow:hidden; }
+  .entry-tag.amazon-tag { color:#232f3e; }
+  .amazon-wordmark { display:flex; flex-direction:column; align-items:center; font:700 14px/15px Arial,sans-serif; letter-spacing:-0.7px; }
+  .amazon-smile { display:block; width:40px; height:8px; overflow:visible; margin-top:-1px; }
+  .entry-tag.ebay-tag { font:400 22px/1 Arial,sans-serif; letter-spacing:-1.3px; }
+  .ebay-e { color: #e53238; }
+  .ebay-b { color: #0064d2; }
+  .ebay-a { color: #f5af02; }
+  .ebay-y { color: #86b817; }
 
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .entry-amount { font-size: 15px; font-weight: 600; }
@@ -970,6 +1012,28 @@
     #entriesList .empty-state { grid-column: 1 / -1; }
   }
 
+  /* Compact transaction composer, including narrow cover screens. */
+  .entry-form { padding:12px; }
+  .entry-form .form-row { grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:auto; align-items:center; gap:8px; margin-bottom:8px; }
+  .entry-form .amount-input, .entry-form .note-input, .entry-form .type-toggle { height:44px; min-width:0; padding-top:0; padding-bottom:0; }
+  .entry-form .note-input { font-size:16px; padding-left:10px; padding-right:6px; }
+  .entry-form .entry-option-label { font-size:11px; line-height:14px; margin-bottom:0; }
+  #entryMerchants { justify-content:center; gap:8px; min-height:44px; flex-wrap:wrap; }
+  .merchant-check { display:flex; align-items:center; gap:4px; min-height:44px; font-size:13px; white-space:nowrap; cursor:pointer; }
+  .merchant-check input { width:17px; height:17px; margin:0; accent-color:var(--gold); }
+  .entry-form .add-btn { min-height:44px; padding:10px; }
+  @media(max-width:480px) {
+    .app { padding-left:12px; padding-right:12px; }
+    .app:has(.entry-form input:focus) { padding-top:8px; }
+    .app:has(.entry-form input:focus) header { margin-bottom:8px; }
+    .app:has(.entry-form input:focus) .balance-card { padding:8px; margin-bottom:8px; }
+    .app:has(.entry-form input:focus) .ring-track { width:100%; height:36px; }
+    .app:has(.entry-form input:focus) .ring-track>svg,
+    .app:has(.entry-form input:focus) .reserve-note,
+    .app:has(.entry-form input:focus) .balance-visual>.status { display:none; }
+    .app:has(.entry-form input:focus) .ring-center { flex-direction:row; gap:8px; }
+    .app:has(.entry-form input:focus) .ring-center .amount { font-size:24px; }
+  }
 </style>
 </head>
 <body>
@@ -1075,14 +1139,22 @@
 
   <div class="entry-form">
     <div class="form-row">
-      <input class="amount-input" id="amountInput" type="text" inputmode="decimal" enterkeyhint="done" placeholder="$0.00">
-      <div class="type-toggle">
-        <button type="button" class="active" data-type="spent" id="typeSpent">Spent</button>
-        <button type="button" data-type="added" id="typeAdded">Received</button>
+      <input class="amount-input" id="amountInput" aria-label="Amount" type="text" inputmode="decimal" enterkeyhint="done" placeholder="$0.00">
+        <div class="type-toggle" role="group" aria-label="Transaction type">
+          <button type="button" class="active" data-type="spent" id="typeSpent">Spent</button>
+          <button type="button" data-type="added" id="typeAdded">Received</button>
+        </div>
+    </div>
+    <div class="form-row entry-options">
+      <input class="note-input" id="noteInput" aria-label="Description (optional)" type="text" enterkeyhint="done" placeholder="What for?" maxlength="40">
+      <div>
+        <div class="merchant-choices" id="entryMerchants" role="group" aria-label="Merchant (optional)">
+          <label class="merchant-check"><input type="checkbox" data-merchant="amazon">Amazon</label>
+          <label class="merchant-check"><input type="checkbox" data-merchant="ebay">eBay</label>
+        </div>
       </div>
     </div>
     <div class="error-text" id="errorText">Enter an amount greater than $0.</div>
-    <input class="note-input" id="noteInput" type="text" enterkeyhint="done" placeholder="What for? (optional)" maxlength="40">
     <button class="add-btn" id="addBtn">Add entry</button>
   </div>
 
@@ -1361,6 +1433,13 @@
     <div class="error-text" id="editError">Enter an amount greater than $0.</div>
     <label for="editNote">Description</label>
     <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40" style="margin-bottom:0">
+    <div class="edit-merchant-field">
+    <span class="entry-option-label" id="editMerchantLabel">Merchant · optional</span>
+    <div class="merchant-choices" id="editMerchants" role="group" aria-labelledby="editMerchantLabel">
+      <button type="button" class="merchant-choice" data-merchant="amazon" aria-pressed="false">Amazon</button>
+      <button type="button" class="merchant-choice" data-merchant="ebay" aria-pressed="false">eBay</button>
+    </div>
+    </div>
     <div class="modal-btn-row">
       <button class="btn btn-secondary" id="editCancel">Cancel</button>
       <button class="btn btn-primary" id="editSave">Save</button>
@@ -1388,7 +1467,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-08-24y';
+  var APP_BUILD = '2026-10-26f';
 
   function defaultState() {
     return {
@@ -1733,6 +1812,12 @@
     return 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   }
 
+  function sanitizeMerchants(value) {
+    return ['amazon', 'ebay'].filter(function(merchant) {
+      return Array.isArray(value) && value.indexOf(merchant) !== -1;
+    }).slice(0, 1);
+  }
+
   // seenIds is shared across one list so duplicates get reassigned. Two rows
   // with the same id used to mean deleting one silently deleted both.
   function sanitizeEntry(raw, seenIds) {
@@ -1752,6 +1837,7 @@
       // This field lands in a class attribute, so it is never free-form.
       type: raw.type === 'added' ? 'added' : 'spent',
       note: typeof raw.note === 'string' ? raw.note.slice(0, 200) : '',
+      merchants: sanitizeMerchants(raw.merchants),
       ts: finiteNumber(raw.ts, Date.now())
     };
 
@@ -2613,7 +2699,8 @@
           '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
           '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') +
             chargeProgressText(e) +
-            (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') + '</div>' +
+            (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') +
+            merchantTags(e) + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
           '<div class="entry-amount ' + escapeAttr(e.type) + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, showCents) + '</div>' +
@@ -2657,6 +2744,58 @@
   }
 
   // --- Entry form ---
+  function merchantTags(entry) {
+    return sanitizeMerchants(entry.merchants).map(function(merchant) {
+      if (merchant === 'amazon') return '<span class="entry-tag merchant-tag amazon-tag" aria-label="Amazon">' +
+        '<span class="amazon-wordmark" aria-hidden="true">amazon' +
+        '<svg class="amazon-smile" viewBox="0 0 40 8" aria-hidden="true"><path d="M3 1.5 Q19 10 35 1.5" fill="none" stroke="#ff9900" stroke-width="2" stroke-linecap="round"/><path d="M30 1 Q34 -0.5 37 1 L35 5" fill="none" stroke="#ff9900" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span>';
+      return '<span class="entry-tag merchant-tag ebay-tag" aria-label="eBay">' +
+        '<span class="ebay-e">e</span><span class="ebay-b">b</span>' +
+        '<span class="ebay-a">a</span><span class="ebay-y">y</span></span>';
+    }).join('');
+  }
+
+  function selectedMerchants(groupId) {
+    if (groupId === 'entryMerchants') {
+      var checked = document.querySelector('#entryMerchants input:checked');
+      return checked ? [checked.getAttribute('data-merchant')] : [];
+    }
+    var selected = document.querySelector('#' + groupId + ' button[aria-pressed="true"]');
+    return selected ? [selected.getAttribute('data-merchant')] : [];
+  }
+
+  function setMerchantChoices(groupId, merchants) {
+    var selected = sanitizeMerchants(merchants);
+    if (groupId === 'entryMerchants') {
+      document.querySelectorAll('#entryMerchants input').forEach(function(input) {
+        input.checked = selected.indexOf(input.getAttribute('data-merchant')) !== -1;
+      });
+      return;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('#' + groupId + ' button'), function(button) {
+      var active = selected.indexOf(button.getAttribute('data-merchant')) !== -1;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  document.querySelectorAll('#entryMerchants input').forEach(function(input) {
+    input.addEventListener('change', function() {
+      if (input.checked) setMerchantChoices('entryMerchants', [input.getAttribute('data-merchant')]);
+    });
+  });
+  ['editMerchants'].forEach(function(groupId) {
+    Array.prototype.forEach.call(document.querySelectorAll('#' + groupId + ' button'), function(button) {
+      // Keep the amount/description keyboard open when tapping a merchant.
+      button.addEventListener('mousedown', function(ev) { ev.preventDefault(); });
+      button.addEventListener('click', function() {
+        var merchant = button.getAttribute('data-merchant');
+        var selected = selectedMerchants(groupId);
+        setMerchantChoices(groupId, selected[0] === merchant ? [] : [merchant]);
+      });
+    });
+  });
+
   // Handle the Spent/Added toggle on touchstart/mousedown with preventDefault so
   // the buttons never take focus - this keeps the keyboard open if the user is
   // mid-entry in the amount field. Click stays bound for keyboard accessibility
@@ -2711,12 +2850,14 @@
       amount: Math.round(amount * 100) / 100,
       type: currentType,
       note: note,
+      merchants: selectedMerchants('entryMerchants'),
       ts: Date.now()
     });
 
     save();
     input.value = '';
     document.getElementById('noteInput').value = '';
+    setMerchantChoices('entryMerchants', []);
     setType('spent');
 
     justAddedId = newId;
@@ -3162,6 +3303,7 @@
     var amountEl = document.getElementById('editAmount');
     amountEl.value = entry.amount.toFixed(2);
     document.getElementById('editNote').value = entry.note || '';
+    setMerchantChoices('editMerchants', entry.merchants);
     document.getElementById('editError').classList.remove('show');
 
     // Opens with nothing focused, so the keyboard stays down until the user
@@ -3218,6 +3360,7 @@
         );
         e.amount = Math.round(amount * 100) / 100;
         e.note = note;
+        e.merchants = selectedMerchants('editMerchants');
         e.ts = updatedDate.getTime();
       }
     });
@@ -3359,7 +3502,8 @@
             '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
             '<div class="entry-meta">' + dateStr +
               chargeProgressText(e) +
-              (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') + '</div>' +
+              (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') +
+              merchantTags(e) + '</div>' +
           '</div>' +
           '<div class="entry-right">' +
             '<div class="entry-amount ' + escapeAttr(e.type) + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, histShowCents) + '</div>' +
@@ -4286,12 +4430,12 @@
   });
 
   // --- Keep the focused field visible above the keyboard ---
-  // Amount field only. The note field intentionally doesn't scroll - doing so
-  // caused unwanted jumps.
-  var keyboardAwareFields = [document.getElementById('amountInput')];
+  // Keep the complete composer, including Add entry, visible while either
+  // text field is focused and the keyboard changes the visible viewport.
+  var keyboardAwareFields = [document.getElementById('amountInput'), document.getElementById('noteInput')];
 
   function scrollFieldIntoView(el) {
-    el.scrollIntoView({ behavior: 'auto', block: 'center' });
+    el.closest('.entry-form').scrollIntoView({ behavior: 'auto', block: 'nearest' });
   }
 
   if (window.visualViewport) {
