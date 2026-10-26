@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Fun Money">
@@ -28,6 +28,9 @@
     --gauge-track: #2C353C;
     --radius: 18px;
   }
+
+  /* Keep the browser canvas and native controls dark during viewport changes. */
+  :root { color-scheme: dark; }
 
   * { box-sizing: border-box; }
 
@@ -1464,7 +1467,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26j';
+  var APP_BUILD = '2026-10-26l';
 
   function defaultState() {
     return {
@@ -4425,6 +4428,8 @@
     el.addEventListener('input', function() { sanitizeAmountInput(el); });
   });
 
+  // The keyboard resizes only the visual viewport. Keep the layout viewport
+  // stable so height-based Fold layouts do not switch during its animation.
   // --- Keep the focused field visible above the keyboard ---
   // Keep the complete composer, including Add entry, visible while either
   // text field is focused and the keyboard changes the visible viewport.
