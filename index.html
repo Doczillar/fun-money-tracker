@@ -263,7 +263,8 @@
     gap: clamp(6px, 2vw, 10px);
     margin-bottom: 10px;
   }
-  .form-row > .amount-input { grid-column: 1 / -1; }
+  .note-row { grid-template-columns: auto minmax(0, 1fr); }
+  .note-row > .note-input { min-width: 0; margin-bottom: 0; }
 
   .merchant-choices {
     display: flex;
@@ -454,6 +455,11 @@
     vertical-align: 1px;
   }
   .entry-tag.merchant-tag { text-transform: none; }
+  .entry-tag.ebay-tag { background: #fff; letter-spacing: 0; }
+  .ebay-e { color: #e53238; }
+  .ebay-b { color: #0064d2; }
+  .ebay-a { color: #f5af02; }
+  .ebay-y { color: #86b817; }
 
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .entry-amount { font-size: 15px; font-weight: 600; }
@@ -1105,17 +1111,19 @@
   <div class="entry-form">
     <div class="form-row">
       <input class="amount-input" id="amountInput" type="text" inputmode="decimal" enterkeyhint="done" placeholder="$0.00">
-      <div class="merchant-choices" id="entryMerchants" role="group" aria-label="Transaction merchants">
-        <label class="merchant-choice"><input type="checkbox" value="amazon">Amazon</label>
-        <label class="merchant-choice"><input type="checkbox" value="ebay">eBay</label>
-      </div>
       <div class="type-toggle">
         <button type="button" class="active" data-type="spent" id="typeSpent">Spent</button>
         <button type="button" data-type="added" id="typeAdded">Received</button>
       </div>
     </div>
     <div class="error-text" id="errorText">Enter an amount greater than $0.</div>
-    <input class="note-input" id="noteInput" type="text" enterkeyhint="done" placeholder="What for? (optional)" maxlength="40">
+    <div class="form-row note-row">
+      <div class="merchant-choices" id="entryMerchants" role="group" aria-label="Transaction merchants">
+        <label class="merchant-choice"><input type="checkbox" value="amazon">Amazon</label>
+        <label class="merchant-choice"><input type="checkbox" value="ebay">eBay</label>
+      </div>
+      <input class="note-input" id="noteInput" type="text" enterkeyhint="done" placeholder="What for? (optional)" maxlength="40">
+    </div>
     <button class="add-btn" id="addBtn">Add entry</button>
   </div>
 
@@ -1425,7 +1433,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26a';
+  var APP_BUILD = '2026-10-26b';
 
   function defaultState() {
     return {
@@ -2704,7 +2712,10 @@
   // --- Entry form ---
   function merchantTags(entry) {
     return sanitizeMerchants(entry.merchants).map(function(merchant) {
-      return '<span class="entry-tag merchant-tag">' + (merchant === 'amazon' ? 'AMZN' : 'eBay') + '</span>';
+      if (merchant === 'amazon') return '<span class="entry-tag merchant-tag">AMZN</span>';
+      return '<span class="entry-tag merchant-tag ebay-tag" aria-label="eBay">' +
+        '<span class="ebay-e">e</span><span class="ebay-b">b</span>' +
+        '<span class="ebay-a">a</span><span class="ebay-y">y</span></span>';
     }).join('');
   }
 
