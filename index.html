@@ -259,7 +259,7 @@
 
   .form-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     grid-auto-rows: 56px;
     gap: clamp(6px, 2vw, 10px);
     margin-bottom: 10px;
@@ -1433,7 +1433,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26d';
+  var APP_BUILD = '2026-10-26e';
 
   function defaultState() {
     return {
