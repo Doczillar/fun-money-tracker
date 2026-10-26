@@ -268,29 +268,26 @@
 
   .merchant-choices {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
+    align-items: stretch;
+    border: 1px solid var(--track);
+    border-radius: 14px;
+    overflow: hidden;
   }
-  .merchant-choices .merchant-choice {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    margin: 0;
+  .merchant-choice {
+    border: none;
+    background: var(--surface-raised);
+    color: var(--muted);
+    min-height: 48px;
+    min-width: 56px;
+    padding: 0 10px;
+    font: inherit;
     font-size: 13px;
-    color: var(--ink);
+    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
   }
-  .merchant-choice input {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    accent-color: var(--gold);
-    cursor: pointer;
-  }
-  .merchant-choice input:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .merchant-choice.active { background: var(--gold); color: #1a1210; }
+  .merchant-choice:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
   .edit-merchants { margin-top: 12px; }
 
   .amount-input {
@@ -1119,8 +1116,8 @@
     <div class="error-text" id="errorText">Enter an amount greater than $0.</div>
     <div class="form-row note-row">
       <div class="merchant-choices" id="entryMerchants" role="group" aria-label="Transaction merchants">
-        <label class="merchant-choice"><input type="checkbox" value="amazon">Amazon</label>
-        <label class="merchant-choice"><input type="checkbox" value="ebay">eBay</label>
+        <button type="button" class="merchant-choice" data-merchant="amazon" aria-pressed="false">Amazon</button>
+        <button type="button" class="merchant-choice" data-merchant="ebay" aria-pressed="false">eBay</button>
       </div>
       <input class="note-input" id="noteInput" type="text" enterkeyhint="done" placeholder="What for? (optional)" maxlength="40">
     </div>
@@ -1403,8 +1400,8 @@
     <label for="editNote">Description</label>
     <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40" style="margin-bottom:0">
     <div class="merchant-choices edit-merchants" id="editMerchants" role="group" aria-label="Transaction merchants">
-      <label class="merchant-choice"><input type="checkbox" value="amazon">Amazon</label>
-      <label class="merchant-choice"><input type="checkbox" value="ebay">eBay</label>
+      <button type="button" class="merchant-choice" data-merchant="amazon" aria-pressed="false">Amazon</button>
+      <button type="button" class="merchant-choice" data-merchant="ebay" aria-pressed="false">eBay</button>
     </div>
     <div class="modal-btn-row">
       <button class="btn btn-secondary" id="editCancel">Cancel</button>
@@ -1433,7 +1430,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26b';
+  var APP_BUILD = '2026-10-26c';
 
   function defaultState() {
     return {
@@ -1781,7 +1778,7 @@
   function sanitizeMerchants(value) {
     return ['amazon', 'ebay'].filter(function(merchant) {
       return Array.isArray(value) && value.indexOf(merchant) !== -1;
-    });
+    }).slice(0, 1);
   }
 
   // seenIds is shared across one list so duplicates get reassigned. Two rows
@@ -2720,18 +2717,30 @@
   }
 
   function selectedMerchants(groupId) {
-    return Array.prototype.map.call(
-      document.querySelectorAll('#' + groupId + ' input:checked'),
-      function(input) { return input.value; }
-    );
+    var selected = document.querySelector('#' + groupId + ' button[aria-pressed="true"]');
+    return selected ? [selected.getAttribute('data-merchant')] : [];
   }
 
   function setMerchantChoices(groupId, merchants) {
     var selected = sanitizeMerchants(merchants);
-    Array.prototype.forEach.call(document.querySelectorAll('#' + groupId + ' input'), function(input) {
-      input.checked = selected.indexOf(input.value) !== -1;
+    Array.prototype.forEach.call(document.querySelectorAll('#' + groupId + ' button'), function(button) {
+      var active = selected.indexOf(button.getAttribute('data-merchant')) !== -1;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
     });
   }
+
+  ['entryMerchants', 'editMerchants'].forEach(function(groupId) {
+    Array.prototype.forEach.call(document.querySelectorAll('#' + groupId + ' button'), function(button) {
+      // Keep the amount/description keyboard open when tapping a merchant.
+      button.addEventListener('mousedown', function(ev) { ev.preventDefault(); });
+      button.addEventListener('click', function() {
+        var merchant = button.getAttribute('data-merchant');
+        var selected = selectedMerchants(groupId);
+        setMerchantChoices(groupId, selected[0] === merchant ? [] : [merchant]);
+      });
+    });
+  });
 
   // Handle the Spent/Added toggle on touchstart/mousedown with preventDefault so
   // the buttons never take focus - this keeps the keyboard open if the user is
