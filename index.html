@@ -258,10 +258,39 @@
   }
 
   .form-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: clamp(6px, 2vw, 10px);
     margin-bottom: 10px;
   }
+  .form-row > .amount-input { grid-column: 1 / -1; }
+
+  .merchant-choices {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .merchant-choices .merchant-choice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .merchant-choice input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--gold);
+    cursor: pointer;
+  }
+  .merchant-choice input:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .edit-merchants { margin-top: 12px; }
 
   .amount-input {
     flex: 1 1 0;
@@ -410,8 +439,7 @@
   .entry-note { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .entry-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-  /* Marks a transaction the app posted from a subscription. The row itself
-     stays fully editable - only its provenance is different. */
+  /* Compact metadata tags for subscriptions and frequently used merchants. */
   .entry-tag {
     display: inline-block;
     font-size: 10px;
@@ -425,6 +453,7 @@
     margin-left: 6px;
     vertical-align: 1px;
   }
+  .entry-tag.merchant-tag { text-transform: none; }
 
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .entry-amount { font-size: 15px; font-weight: 600; }
@@ -1076,6 +1105,10 @@
   <div class="entry-form">
     <div class="form-row">
       <input class="amount-input" id="amountInput" type="text" inputmode="decimal" enterkeyhint="done" placeholder="$0.00">
+      <div class="merchant-choices" id="entryMerchants" role="group" aria-label="Transaction merchants">
+        <label class="merchant-choice"><input type="checkbox" value="amazon">Amazon</label>
+        <label class="merchant-choice"><input type="checkbox" value="ebay">eBay</label>
+      </div>
       <div class="type-toggle">
         <button type="button" class="active" data-type="spent" id="typeSpent">Spent</button>
         <button type="button" data-type="added" id="typeAdded">Received</button>
@@ -1361,6 +1394,10 @@
     <div class="error-text" id="editError">Enter an amount greater than $0.</div>
     <label for="editNote">Description</label>
     <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40" style="margin-bottom:0">
+    <div class="merchant-choices edit-merchants" id="editMerchants" role="group" aria-label="Transaction merchants">
+      <label class="merchant-choice"><input type="checkbox" value="amazon">Amazon</label>
+      <label class="merchant-choice"><input type="checkbox" value="ebay">eBay</label>
+    </div>
     <div class="modal-btn-row">
       <button class="btn btn-secondary" id="editCancel">Cancel</button>
       <button class="btn btn-primary" id="editSave">Save</button>
@@ -1388,7 +1425,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-08-24y';
+  var APP_BUILD = '2026-10-26a';
 
   function defaultState() {
     return {
@@ -1733,6 +1770,12 @@
     return 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   }
 
+  function sanitizeMerchants(value) {
+    return ['amazon', 'ebay'].filter(function(merchant) {
+      return Array.isArray(value) && value.indexOf(merchant) !== -1;
+    });
+  }
+
   // seenIds is shared across one list so duplicates get reassigned. Two rows
   // with the same id used to mean deleting one silently deleted both.
   function sanitizeEntry(raw, seenIds) {
@@ -1752,6 +1795,7 @@
       // This field lands in a class attribute, so it is never free-form.
       type: raw.type === 'added' ? 'added' : 'spent',
       note: typeof raw.note === 'string' ? raw.note.slice(0, 200) : '',
+      merchants: sanitizeMerchants(raw.merchants),
       ts: finiteNumber(raw.ts, Date.now())
     };
 
@@ -2613,7 +2657,8 @@
           '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
           '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') +
             chargeProgressText(e) +
-            (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') + '</div>' +
+            (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') +
+            merchantTags(e) + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
           '<div class="entry-amount ' + escapeAttr(e.type) + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, showCents) + '</div>' +
@@ -2657,6 +2702,26 @@
   }
 
   // --- Entry form ---
+  function merchantTags(entry) {
+    return sanitizeMerchants(entry.merchants).map(function(merchant) {
+      return '<span class="entry-tag merchant-tag">' + (merchant === 'amazon' ? 'AMZN' : 'eBay') + '</span>';
+    }).join('');
+  }
+
+  function selectedMerchants(groupId) {
+    return Array.prototype.map.call(
+      document.querySelectorAll('#' + groupId + ' input:checked'),
+      function(input) { return input.value; }
+    );
+  }
+
+  function setMerchantChoices(groupId, merchants) {
+    var selected = sanitizeMerchants(merchants);
+    Array.prototype.forEach.call(document.querySelectorAll('#' + groupId + ' input'), function(input) {
+      input.checked = selected.indexOf(input.value) !== -1;
+    });
+  }
+
   // Handle the Spent/Added toggle on touchstart/mousedown with preventDefault so
   // the buttons never take focus - this keeps the keyboard open if the user is
   // mid-entry in the amount field. Click stays bound for keyboard accessibility
@@ -2711,12 +2776,14 @@
       amount: Math.round(amount * 100) / 100,
       type: currentType,
       note: note,
+      merchants: selectedMerchants('entryMerchants'),
       ts: Date.now()
     });
 
     save();
     input.value = '';
     document.getElementById('noteInput').value = '';
+    setMerchantChoices('entryMerchants', []);
     setType('spent');
 
     justAddedId = newId;
@@ -3162,6 +3229,7 @@
     var amountEl = document.getElementById('editAmount');
     amountEl.value = entry.amount.toFixed(2);
     document.getElementById('editNote').value = entry.note || '';
+    setMerchantChoices('editMerchants', entry.merchants);
     document.getElementById('editError').classList.remove('show');
 
     // Opens with nothing focused, so the keyboard stays down until the user
@@ -3218,6 +3286,7 @@
         );
         e.amount = Math.round(amount * 100) / 100;
         e.note = note;
+        e.merchants = selectedMerchants('editMerchants');
         e.ts = updatedDate.getTime();
       }
     });
@@ -3359,7 +3428,8 @@
             '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
             '<div class="entry-meta">' + dateStr +
               chargeProgressText(e) +
-              (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') + '</div>' +
+              (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') +
+              merchantTags(e) + '</div>' +
           '</div>' +
           '<div class="entry-right">' +
             '<div class="entry-amount ' + escapeAttr(e.type) + ' num">' + (e.type === 'added' ? '+' : '\u2212') + fmtMoney(e.amount, histShowCents) + '</div>' +
