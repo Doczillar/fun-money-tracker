@@ -458,15 +458,11 @@
     margin-left: 6px;
     vertical-align: 1px;
   }
-  .entry-tag.merchant-tag { display:inline-flex; align-items:center; justify-content:center; width:64px; height:28px; padding:2px 6px; vertical-align:middle; text-transform:none; background:#fff; letter-spacing:0; overflow:hidden; }
+  .entry-tag.merchant-tag { display:inline-flex; align-items:center; justify-content:center; width:48px; height:22px; padding:2px 4px; vertical-align:middle; text-transform:none; background:#fff; letter-spacing:0; overflow:hidden; }
   .entry-tag.amazon-tag { color:#232f3e; }
-  .amazon-wordmark { display:flex; flex-direction:column; align-items:center; font:700 14px/15px Arial,sans-serif; letter-spacing:-0.7px; }
-  .amazon-smile { display:block; width:40px; height:8px; overflow:visible; margin-top:-1px; }
-  .entry-tag.ebay-tag { font:400 22px/1 Arial,sans-serif; letter-spacing:-1.3px; }
-  .ebay-e { color: #e53238; }
-  .ebay-b { color: #0064d2; }
-  .ebay-a { color: #f5af02; }
-  .ebay-y { color: #86b817; }
+  .amazon-wordmark { display:flex; flex-direction:column; align-items:center; font:700 11px/12px Arial,sans-serif; letter-spacing:-0.5px; }
+  .amazon-smile { display:block; width:30px; height:6px; overflow:visible; margin-top:-1px; }
+  .ebay-logo { display:block; width:36px; height:15px; object-fit:contain; }
 
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .entry-amount { font-size: 15px; font-weight: 600; }
@@ -1013,8 +1009,8 @@
   }
 
   /* Compact transaction composer, including narrow cover screens. */
-  .entry-form { padding:12px; }
-  .entry-form .form-row { grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:auto; align-items:center; gap:8px; margin-bottom:8px; }
+  .entry-form { padding:16px 12px; }
+  .entry-form .form-row { grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:auto; align-items:center; gap:8px; margin-bottom:12px; }
   .entry-form .amount-input, .entry-form .note-input, .entry-form .type-toggle { height:44px; min-width:0; padding-top:0; padding-bottom:0; }
   .entry-form .note-input { font-size:16px; padding-left:10px; padding-right:6px; }
   .entry-form .entry-option-label { font-size:11px; line-height:14px; margin-bottom:0; }
@@ -1467,7 +1463,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26f';
+  var APP_BUILD = '2026-10-26h';
 
   function defaultState() {
     return {
@@ -2749,9 +2745,8 @@
       if (merchant === 'amazon') return '<span class="entry-tag merchant-tag amazon-tag" aria-label="Amazon">' +
         '<span class="amazon-wordmark" aria-hidden="true">amazon' +
         '<svg class="amazon-smile" viewBox="0 0 40 8" aria-hidden="true"><path d="M3 1.5 Q19 10 35 1.5" fill="none" stroke="#ff9900" stroke-width="2" stroke-linecap="round"/><path d="M30 1 Q34 -0.5 37 1 L35 5" fill="none" stroke="#ff9900" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span>';
-      return '<span class="entry-tag merchant-tag ebay-tag" aria-label="eBay">' +
-        '<span class="ebay-e">e</span><span class="ebay-b">b</span>' +
-        '<span class="ebay-a">a</span><span class="ebay-y">y</span></span>';
+      // Embedded vector wordmark keeps the correct logo shape available offline.
+      return '<span class="entry-tag merchant-tag ebay-tag" aria-label="eBay"><img class="ebay-logo" alt="" aria-hidden="true" width="36" height="15" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201000%20400.75098%22%3E%3Cpath%20fill%3D%22%23ffbc13%22%20d%3D%22m%20633.07803%2C212.53323%20c%20-45.43873%2C1.48929%20-73.6715%2C9.689%20-73.6715%2C39.61897%200%2C19.37591%2015.44713%2C40.38162%2054.66334%2C40.38162%2052.57698%2C0%2080.64259%2C-28.65902%2080.64259%2C-75.66331%20l%200.003%2C-5.16994%20c%20-18.43302%2C0%20-41.16414%2C0.16089%20-61.63704%2C0.83266%20z%20m%20111.75103%2C62.10248%20c%200%2C14.58313%200.42155%2C28.9782%201.69406%2C41.94092%20h%20-46.61408%20c%20-1.24325%2C-10.67368%20-1.6972%2C-21.27945%20-1.6972%2C-31.56656%20-25.20195%2C30.97941%20-55.17735%2C39.88537%20-96.76149%2C39.88537%20-61.67674%2C0%20-94.70072%2C-32.59982%20-94.70072%2C-70.30689%200%2C-54.61215%2044.91583%2C-73.86739%20122.89013%2C-75.65391%2021.32332%2C-0.48686%2045.27419%2C-0.55894%2065.07531%2C-0.55894%20l%20-0.003%2C-5.33606%20c%200%2C-36.56098%20-23.44364%2C-51.59335%20-64.06765%2C-51.59335%20-30.15876%2C0%20-52.38579%2C12.48057%20-54.6764%2C34.0468%20h%20-52.65168%20c%205.57217%2C-53.77165%2062.06643%2C-67.37115%20111.74005%2C-67.37115%2059.50837%2C0%20109.77228%2C21.17288%20109.77228%2C84.11481%20z%22%2F%3E%3Cpath%20fill%3D%22%23f12c2d%22%20d%3D%22m%20199.63633%2C185.86602%20c%20-1.94427%2C-46.87735%20-35.77951%2C-64.41973%20-71.94139%2C-64.41973%20-38.99421%2C0%20-70.12667%2C19.7327%20-75.58026%2C64.41973%20z%20M%2051.034408%2C219.1909%20c%202.704332%2C45.48365%2034.069782%2C72.38437%2077.197532%2C72.38437%2029.88033%2C0%2056.45979%2C-12.17498%2065.35948%2C-38.66041%20h%2051.68424%20c%20-10.05205%2C53.73979%20-67.15384%2C71.98058%20-116.303%2C71.98058%20C%2039.606424%2C324.89544%200%2C275.67889%200%2C209.30653%200%2C136.24203%2040.965642%2C88.12194%20129.78809%2C88.12194%20c%2070.69867%2C0%20122.49992%2C36.99926%20122.49992%2C117.75572%20v%2013.31324%20z%22%2F%3E%3Cpath%20fill%3D%22%230968f6%22%20d%3D%22m%20380.83181%2C290.6235%20c%2046.57228%2C0%2078.44078%2C-33.52181%2078.44078%2C-84.10854%200%2C-50.58203%20-31.8685%2C-84.10854%20-78.44078%2C-84.10854%20-46.31058%2C0%20-78.44392%2C33.52651%20-78.44392%2C84.10854%200%2C50.58673%2032.13334%2C84.10854%2078.44392%2C84.10854%20z%20M%20252.2854%2C0%20h%2050.10249%20l%20-0.005%2C125.87707%20c%2024.55682%2C-29.25975%2058.38892%2C-37.75513%2091.68976%2C-37.75513%2055.83503%2C0%20117.85132%2C37.6773%20117.85132%2C119.02875%200%2C68.12232%20-49.32155%2C117.74475%20-118.78114%2C117.74475%20-36.35726%2C0%20-70.58062%2C-13.04265%20-91.68663%2C-38.88294%200%2C10.32107%20-0.57618%2C20.72364%20-1.70503%2C30.56413%20h%20-49.17162%20c%200.85513%2C-15.90944%201.70555%2C-35.7184%201.70555%2C-51.74693%20z%22%2F%3E%3Cpath%20fill%3D%22%2393c822%22%20d%3D%22M%201000%2C96.45747%20845.05541%2C400.75099%20H%20788.94926%20L%20833.49578%2C316.25589%20716.89033%2C96.45747%20h%2058.6266%20l%2085.80469%2C171.73057%2085.56283%2C-171.73057%20z%22%2F%3E%3C%2Fsvg%3E"></span>';
     }).join('');
   }
 
