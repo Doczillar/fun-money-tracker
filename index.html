@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Fun Money">
@@ -28,6 +28,9 @@
     --gauge-track: #2C353C;
     --radius: 18px;
   }
+
+  /* Keep the browser canvas and native controls dark during viewport changes. */
+  :root { color-scheme: dark; }
 
   * { box-sizing: border-box; }
 
@@ -164,7 +167,7 @@
      drives all arc and cap-dot positions from a single eased value,
      so everything moves in perfect unison. */
   #ringValue, #ringReserve {
-    transition: stroke 0.3s ease;
+    transition: stroke 0.15s ease;
   }
   /* Centre text sits over the SVG */
   .ring-center {
@@ -200,13 +203,13 @@
     from { opacity: 0; transform: translateY(-8px); }
     to { opacity: 1; transform: none; }
   }
-  .entry-row.just-added { animation: entryIn 0.3s ease; }
+  .entry-row.just-added { animation: entryIn 0.12s ease; }
   @keyframes amountPulse {
     0% { transform: scale(1); }
     40% { transform: scale(1.1); }
     100% { transform: scale(1); }
   }
-  .balance-visual .amount.pulse { animation: amountPulse 0.45s ease; }
+  .balance-visual .amount.pulse { animation: amountPulse 0.18s ease; }
 
   .float-amount {
     position: absolute;
@@ -218,7 +221,7 @@
     font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
     pointer-events: none;
     white-space: nowrap;
-    animation: floatDown 1.1s ease-out forwards;
+    animation: floatDown 0.45s ease-out forwards;
   }
   .float-amount.spent { color: var(--coral); }
   .float-amount.added { color: var(--mint); }
@@ -230,7 +233,7 @@
   @media (prefers-reduced-motion: reduce) {
     .entry-row.just-added { animation: none; }
     .balance-visual .amount.pulse { animation: none; }
-    .float-amount { animation: floatFade 1.1s ease-out forwards; }
+    .float-amount { animation: floatFade 0.45s ease-out forwards; }
   }
   @keyframes floatFade {
     0% { opacity: 1; }
@@ -657,7 +660,8 @@
     box-shadow: 0 24px 60px rgba(0,0,0,0.45);
     transform: translateY(var(--modal-shift, 0px)) scale(0.96);
     opacity: 0;
-    transition: transform 0.18s ease, opacity 0.18s ease;
+    /* Follow keyboard positioning immediately, without a trailing slide. */
+    transition: opacity 0.1s ease;
   }
   /* Wider than the shared .modal max-width: this is the one modal with a
      horizontal choice-stack, and "Every few months" needs the extra room to
@@ -1467,7 +1471,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26k';
+  var APP_BUILD = '2026-10-26m';
 
   function defaultState() {
     return {
@@ -2429,7 +2433,7 @@
 
   // ---- Ring animation state ------------------------------------------------
   // All arc and cap-dot geometry is driven by a single requestAnimationFrame
-  // loop using a fixed-duration ease (matching what CSS transition:0.5s ease
+  // loop using a short fixed-duration ease (similar to CSS ease
   // would do), so depleting and refilling feel identical and symmetrical.
   // The green and gray fractions are each interpolated DIRECTLY between
   // their previous and new values using the same eased progress - never
@@ -2438,7 +2442,7 @@
   // its final frame). Direct interpolation works identically both ways,
   // and both arcs plus both cap dots still move in perfect unison.
   var RING_CX = 110, RING_CY = 110, RING_R = 88;
-  var RING_DURATION = 500; // ms - matches the old CSS transition duration
+  var RING_DURATION = 180; // ms - brief feedback; never blocks another entry
   var RING_SNAP = 0.0002;  // treat differences below this as "already there"
   var _colorFracFrom = 0, _colorFracCur = 0, _colorFracTgt = 0;
   var _reserveFracFrom = 0, _reserveFracCur = 0, _reserveFracTgt = 0;
@@ -2888,7 +2892,7 @@
       if (floatEl.parentNode) floatEl.parentNode.removeChild(floatEl);
     }
     floatEl.addEventListener('animationend', removeFloat);
-    setTimeout(removeFloat, 1500); // fallback in case animationend never fires
+    setTimeout(removeFloat, 650); // fallback in case animationend never fires
 
     // Submitting via the keyboard means the user is likely entering several in
     // a row, so keep focus (and the keyboard) on the amount field. Tapping the
@@ -4428,6 +4432,8 @@
     el.addEventListener('input', function() { sanitizeAmountInput(el); });
   });
 
+  // The keyboard resizes only the visual viewport. Keep the layout viewport
+  // stable so height-based Fold layouts do not switch during its animation.
   // --- Keep the focused field visible above the keyboard ---
   // Keep the complete composer, including Add entry, visible while either
   // text field is focused and the keyboard changes the visible viewport.
