@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Fun Money">
@@ -50,6 +50,7 @@
     margin: 0 auto;
     padding: 24px 20px 40px;
     min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .num {
@@ -1463,7 +1464,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26i';
+  var APP_BUILD = '2026-10-26j';
 
   function defaultState() {
     return {
@@ -4433,23 +4434,22 @@
     el.closest('.entry-form').scrollIntoView({ behavior: 'auto', block: 'nearest' });
   }
 
-  if (window.visualViewport) {
-    // Fires exactly when the on-screen keyboard finishes resizing the
-    // viewport, so this is more reliable than guessing a fixed delay.
-    window.visualViewport.addEventListener('resize', function() {
+  // Wait for keyboard resizing to settle before scrolling. Scrolling on every
+  // animation frame can expose a transient blank area below the focused field.
+  var keyboardScrollTimer;
+  function scheduleKeyboardScroll() {
+    clearTimeout(keyboardScrollTimer);
+    keyboardScrollTimer = setTimeout(function() {
       var active = document.activeElement;
-      if (keyboardAwareFields.indexOf(active) !== -1) {
-        scrollFieldIntoView(active);
-      }
-    });
+      if (keyboardAwareFields.indexOf(active) !== -1) scrollFieldIntoView(active);
+    }, 150);
   }
 
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleKeyboardScroll);
+  }
   keyboardAwareFields.forEach(function(el) {
-    el.addEventListener('focus', function() {
-      // Fallback for browsers without VisualViewport support - give the
-      // keyboard animation a moment to finish before scrolling.
-      setTimeout(function() { scrollFieldIntoView(el); }, 120);
-    });
+    el.addEventListener('focus', scheduleKeyboardScroll);
   });
 
   // --- Recovery -----------------------------------------------------------
