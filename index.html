@@ -1108,6 +1108,10 @@
                   stroke="var(--muted)" stroke-width="16" stroke-linecap="butt"
                   pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"
                   transform="rotate(-90 110 110)"/>
+          <!-- Paint the trailing cap below the value arc. A short reserve
+               segment can put this round cap across the interior seam;
+               the value arc must cover that overlap with its flat edge. -->
+          <circle id="ringCapEnd" r="8"/>
           <!-- Value arc: spendable money, colour-coded mint/gold/coral.
                Drawn on top; butt caps on both ends so the green/gray seam
                is always a sharp radial line, never a rounded overlap. -->
@@ -1120,7 +1124,6 @@
                (ratio >= ~1) so the green/gray seam stays flat at 100% full.
                Positioned and coloured entirely by renderRing() in JS. -->
           <circle id="ringCapStart" r="8"/>
-          <circle id="ringCapEnd" r="8"/>
         </svg>
         <div class="ring-center">
           <div class="amount num" id="remainingAmount">$0</div>
@@ -1464,7 +1467,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26j';
+  var APP_BUILD = '2026-10-26k';
 
   function defaultState() {
     return {
