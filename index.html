@@ -1475,7 +1475,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27b';
+  var APP_BUILD = '2026-10-27c';
 
   function defaultState() {
     return {
@@ -2428,7 +2428,7 @@
     var budgetOfEl = document.getElementById('budgetOf');
     budgetOfEl.classList.toggle('over', trueRemaining < 0);
     budgetOfEl.textContent = trueRemaining < 0
-      ? 'over this month\u2019s budget'
+      ? 'over budget'
       : 'remaining';
 
     renderReserve(remaining, ratio, gaugeMax, gaugeColor);
