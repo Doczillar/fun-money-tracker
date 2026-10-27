@@ -1478,7 +1478,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27e';
+  var APP_BUILD = '2026-10-27f';
 
   function defaultState() {
     return {
@@ -1739,10 +1739,8 @@
         kind: 'rollover'
       });
       state.budget = state.baseBudget;
-      save();
     } else if (alreadyRecorded && Math.abs(adjustment) >= 0.005) {
       state.budget = state.baseBudget;
-      save();
     }
   }
 
@@ -1762,7 +1760,7 @@
         changed = true;
       }
     });
-    if (changed) save();
+    return changed;
   }
 
   function canUndoTransition() {
@@ -1781,7 +1779,7 @@
       // to load, and nothing of the user's to lose.
       return null;
     }
-    if (!raw) return null;
+    if (raw === null) return null;
 
     var parsed;
     try {
@@ -1794,7 +1792,9 @@
     }
     // Errors from here propagate deliberately, for the same reason: a bug in
     // sanitization must not look like "new user" and overwrite real data.
-    return sanitizeState(parsed);
+    var loaded = sanitizeState(parsed);
+    if (!loaded) throw new Error('Saved data is not a valid Fun Money state');
+    return loaded;
   }
 
   // --- Untrusted state normalization -------------------------------------
@@ -2176,7 +2176,7 @@
   // next time the app opened.
   //
   // Returns true when anything was posted, so callers know to save.
-  function postDueSubscriptions() {
+  function postDueSubscriptions(settlePeriod) {
     if (!state.monthKey || !state.subscriptions.length) return false;
 
     var today = startOfToday();
@@ -2185,7 +2185,7 @@
     state.subscriptions.forEach(function(sub) {
       if (!subscriptionChargesIn(sub, state.monthKey)) return;
       if (alreadyPostedFor(sub, state.monthKey)) return;
-      if (today < subscriptionDueDayStart(sub, state.monthKey)) return;
+      if (!settlePeriod && today < subscriptionDueDayStart(sub, state.monthKey)) return;
 
       var entry = {
         id: 'sub-' + sub.id + '-' + state.monthKey,
@@ -2269,9 +2269,8 @@
 
   // The same subscriptions reservedThisPeriod sums, but as a list rather
   // than a total - these are the ones a ghost card gets drawn for. Since
-  // postDueSubscriptions runs before every render, anything still in this
-  // list genuinely hasn't come due yet; it isn't a stale or overdue charge
-  // waiting on a boot that hasn't happened.
+  // Due charges are posted at launch and when returning to the app. This
+  // list contains the remaining scheduled charges for the open period.
   function upcomingSubscriptionsThisPeriod() {
     if (!state.monthKey) return [];
     var list = [];
@@ -2365,7 +2364,7 @@
     if (undoReady) {
       var undoTarget = monthKeyName(state.monthKey);
       document.getElementById('undoMonthBannerText').textContent =
-        undoTarget + ' started. You can undo until you add its first transaction.';
+        undoTarget + ' started. You can undo until you change transactions or subscriptions.';
     }
 
     var histLink = document.getElementById('historyLink');
@@ -2978,7 +2977,7 @@
       help.textContent = 'You can still restore ' + monthKeyName(state.transitionUndo.sourceMonthKey) +
         ', or close ' + monthKeyName(state.monthKey) + ' to continue. Closing it commits the earlier change.';
     } else if (undoReady) {
-      help.textContent = 'No new transactions have been added yet, so you can restore ' +
+      help.textContent = 'Transactions and subscriptions are unchanged, so you can restore ' +
         monthKeyName(state.transitionUndo.sourceMonthKey) + '.';
     } else if (allowed) {
       var overdue = startOfToday() > periodEndDate(state.monthKey);
@@ -3053,7 +3052,7 @@
     freshChoice.setAttribute('aria-checked', rollOver === false ? 'true' : 'false');
 
     var targetName = monthKeyName(nextMonthKey(pendingSourceMonthKey));
-    var leftover = computeRemaining();
+    var leftover = computeRemaining() - reservedThisPeriod();
     var startingBalance = state.baseBudget + (rollOver ? leftover : 0);
     var confirmBtn = document.getElementById('confirmOk');
     confirmBtn.disabled = false;
@@ -3068,7 +3067,7 @@
     var targetKey = nextMonthKey(state.monthKey);
     var sourceName = monthKeyName(state.monthKey);
     var targetName = monthKeyName(targetKey);
-    var leftover = computeRemaining();
+    var leftover = computeRemaining() - reservedThisPeriod();
     var carryStart = Math.round((state.baseBudget + leftover) * 100) / 100;
 
     document.getElementById('confirmTitle').textContent =
@@ -3082,7 +3081,8 @@
     document.getElementById('freshStartChoiceDetail').textContent =
       targetName + ' starts at ' + fmt(state.baseBudget);
     document.getElementById('transitionTimingNote').textContent =
-      transitionTimingMessage(state.monthKey, targetKey);
+      transitionTimingMessage(state.monthKey, targetKey) +
+      ' Any remaining subscription charges for ' + sourceName + ' will be included when it closes.';
 
     var carryChoice = document.getElementById('carryOverChoice');
     var freshChoice = document.getElementById('freshStartChoice');
@@ -3147,7 +3147,7 @@
 
     var sourceKey = state.monthKey;
     var targetKey = nextMonthKey(sourceKey);
-    var leftover = computeRemaining();
+    var leftover = computeRemaining() - reservedThisPeriod();
     var rollOver = pendingRollOver;
     var previousState = {
       monthKey: state.monthKey,
@@ -3157,6 +3157,11 @@
       history: cloneData(state.history),
       subscriptions: cloneData(state.subscriptions)
     };
+
+    // Closing settles all scheduled charges, including dates still ahead.
+    // The undo snapshot above preserves the original unposted schedule.
+    postDueSubscriptions(true);
+    leftover = computeRemaining();
 
     // Appended, not replaced: the month being closed joins the previously
     // closed one, and the pair is trimmed to the two the app surfaces.
@@ -3399,6 +3404,7 @@
         e.ts = updatedDate.getTime();
       }
     });
+    state.transitionUndo = null;
     save();
     closeEditModal();
     render();
@@ -3442,6 +3448,7 @@
     state.entries = state.entries.filter(function(e) {
       return e.id !== id || isSystemRolloverEntry(e);
     });
+    state.transitionUndo = null;
     save();
     closeDeleteModal();
     render();
@@ -3939,6 +3946,7 @@
     }
 
     postDueSubscriptions();
+    state.transitionUndo = null;
     save();
     closeSubEditor();
 
@@ -4043,6 +4051,7 @@
     // Resuming is harmless and reversible, so it doesn't need a confirmation.
     if (sub.canceledAt) {
       resumeSubscription(sub);
+      state.transitionUndo = null;
       save();
       closeSubEditor();
       renderSubsModal();
@@ -4070,6 +4079,7 @@
       sub.canceledAt = Date.now();
     }
 
+    state.transitionUndo = null;
     save();
     closeSubEditor();
     renderSubsModal();
@@ -4372,7 +4382,9 @@
     }
 
     if (!save()) {
-      return 'The backup loaded but couldn\u2019t be saved on this device. Check your storage and try again.';
+      state = previous;
+      try { render(); } catch (ignored) {}
+      return 'The backup couldn\u2019t be saved. Your current data is unchanged. Check your storage and try again.';
     }
     return null;
   }
@@ -4693,29 +4705,49 @@
       var hadControllerAtLaunch = !!navigator.serviceWorker.controller;
 
       function hasUnsavedInput() {
-        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editDay', 'editAmount', 'editNote',
-          'subNote', 'subAmount', 'subDay', 'subMonths'];
-        return ids.some(function(id) {
-          var el = document.getElementById(id);
-          return el && el.value && el.value.trim() !== '';
-        });
+        // Closed dialogs retain their saved values, not unfinished edits.
+        return ['amountInput', 'noteInput'].some(function(id) {
+          return document.getElementById(id).value.trim() !== '';
+        }) || selectedMerchants('entryMerchants').length > 0 || currentType !== 'spent';
       }
 
-      // This used to also require that the user hadn't interacted at all this
-      // session, which in practice meant anyone who opened the app and tapped
-      // something never received an update until a launch they didn't touch.
-      // What actually needs protecting is work in progress: half-typed input,
-      // or an open dialog. Reloading while someone reads their list is
-      // harmless, since everything on screen is already persisted.
       function canApplyUpdateNow() {
         return !hasUnsavedInput() &&
           document.visibilityState === 'visible' &&
-          !document.querySelector('.modal-overlay.show');
+          !document.querySelector('.modal-overlay.show') &&
+          !document.querySelector('#saveErrorBanner.show') &&
+          !document.querySelector('.entry-form input:focus');
       }
 
+      var updateRegistration = null;
+      var needsReload = false;
+      var updateTimer;
+      function applyReadyUpdate() {
+        if (!canApplyUpdateNow() || reloadStarted) return;
+        if (needsReload) {
+          reloadStarted = true;
+          window.location.reload();
+        } else if (updateRegistration && updateRegistration.waiting) {
+          updateRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+      function scheduleUpdateCheck() {
+        clearTimeout(updateTimer);
+        updateTimer = setTimeout(applyReadyUpdate, 200);
+      }
       function activateWaitingWorker(registration) {
-        if (!registration.waiting || !canApplyUpdateNow()) return;
-        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        updateRegistration = registration;
+        applyReadyUpdate();
+      }
+      // Retry after work is saved/canceled or focus leaves an empty composer.
+      ['input', 'change', 'click', 'focusout', 'visibilitychange'].forEach(function(type) {
+        document.addEventListener(type, scheduleUpdateCheck);
+      });
+      if (window.MutationObserver) {
+        var updateObserver = new MutationObserver(scheduleUpdateCheck);
+        document.querySelectorAll('.modal-overlay').forEach(function(el) {
+          updateObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+        });
       }
 
       navigator.serviceWorker.addEventListener('controllerchange', function() {
@@ -4725,10 +4757,8 @@
           hadControllerAtLaunch = true;
           return;
         }
-        if (reloadStarted || !canApplyUpdateNow()) return;
-
-        reloadStarted = true;
-        window.location.reload();
+        needsReload = true;
+        applyReadyUpdate();
       });
 
       window.addEventListener('load', function() {
@@ -4775,13 +4805,13 @@
     }
     if (!state.monthKey) {
       state.monthKey = currentMonthKey();
-      save();
     }
 
-    if (postDueSubscriptions()) save();
-    if (purgeStaleCanceledSubscriptions()) save();
+    postDueSubscriptions();
+    purgeStaleCanceledSubscriptions();
 
     render();
+    save();
   } catch (err) {
     showRecovery(err);
   }
@@ -4789,3 +4819,4 @@
 </script>
 </body>
 </html>
+
