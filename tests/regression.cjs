@@ -87,6 +87,27 @@ test('next charge jumps match schedules, clamping and posted months',()=>{
  assert.equal(vm.runInContext('nextChargeDate(rule)',c,{timeout:100}),null);
  assert.equal(c.nextChargeDate({...sub(),cadenceMonths:Number.MAX_VALUE}),null);
 });
+test('merchant touches keep input focus and toggle exactly one checkbox',()=>{
+ const {c}=env();let blurCount=0;c.document.activeElement={blur:()=>blurCount++};
+ const inputs=['amazon','ebay'].map(name=>({checked:false,getAttribute:()=>name}));
+ const labels=inputs.map(input=>({handlers:{},querySelector:()=>input,addEventListener(t,fn,opts){this.handlers[t]=fn;if(t==='touchstart')assert.equal(opts.passive,false)}}));
+ c.document.querySelectorAll=sel=>sel.includes('.merchant-check')?labels:inputs;
+ let a=script.indexOf("  document.querySelectorAll('#entryMerchants .merchant-check')"),b=script.indexOf("\n  document.querySelectorAll('#entryMerchants input')",a);
+ vm.runInContext(script.slice(a,b),c);
+ let prevented=0;const touch={touches:[{}],preventDefault:()=>prevented++};
+ labels[0].handlers.pointerdown({pointerType:'touch'});assert.equal(inputs[0].checked,false);
+ labels[0].handlers.touchstart(touch);assert.equal(inputs[0].checked,true);
+ labels[1].handlers.touchstart(touch);assert.equal(inputs[0].checked,false);assert.equal(inputs[1].checked,true);
+ labels[1].handlers.touchstart(touch);assert.equal(inputs[1].checked,false);assert.equal(prevented,3);assert.equal(blurCount,0);
+});
+test('successful Add clears amount, description and merchants before dismissing keyboard',()=>{
+ const {c,el}=env();let blurred=false;const inputs=['amazon','ebay'].map(name=>({checked:name==='amazon',getAttribute:()=>name}));
+ c.document.querySelectorAll=()=>inputs;c.document.querySelector=sel=>sel.includes(':checked')?inputs.find(x=>x.checked):{appendChild(){}};
+ c.document.createElement=()=>({addEventListener(){}});c.currentType='spent';
+ el('amountInput').value='12.34';el('noteInput').value='Test';el('noteInput').blur=()=>blurred=true;c.document.activeElement=el('noteInput');
+ c.addEntry(false);assert.equal(c.state.entries.length,1);assert.equal(c.state.entries[0].merchants[0],'amazon');assert.equal(el('amountInput').value,'');assert.equal(el('noteInput').value,'');assert(inputs.every(x=>!x.checked));assert(blurred);
+ blurred=false;c.addEntry(false);assert.equal(c.state.entries.length,1);assert.equal(blurred,false);
+});
 (async()=>{
  for(const status of [200,404,503]){
  let writes=0;const c={console,Request,Response,URL,Promise,setTimeout(){},self:{addEventListener(){},location:{origin:'https://example.com'}},fetch:async()=>({ok:status===200,status,type:'basic',clone:()=>new Response('network'),text:async()=>'network'}),caches:{open:async()=>({match:async()=>new Response('cached app'),put:async()=>writes++})}};
