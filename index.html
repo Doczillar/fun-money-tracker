@@ -446,7 +446,8 @@
 
   .entry-left { display: flex; flex-direction: column; min-width: 0; }
   .entry-note { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .entry-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .entry-meta { display:flex; align-items:center; flex-wrap:wrap; column-gap:6px; row-gap:2px; font-size:12px; line-height:16px; color:var(--muted); margin-top:2px; }
+  .entry-meta .entry-tag { margin-left:0; }
 
   /* Compact metadata tags for subscriptions and frequently used merchants. */
   .entry-tag {
@@ -471,6 +472,8 @@
     letter-spacing: 0.02em;
   }
 
+  .entry-tag.ebay-tag { color:var(--coral); background:rgba(239, 119, 99, 0.14); }
+
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .entry-amount { font-size: 15px; font-weight: 600; }
   .entry-amount.spent { color: var(--coral); }
@@ -483,9 +486,9 @@
      for something that already happened; the same muted grey the gauge uses
      for "not really available yet" money carries the same meaning here. */
   .ghost-entry {
-    opacity: 0.6;
-    border: 1px dashed var(--track);
-    background: none;
+    opacity: 0.8;
+    border: 1px dashed var(--muted);
+    background: var(--surface-raised);
   }
   .ghost-entry .entry-amount { color: var(--muted); }
   .entry-tag.ghost-tag {
@@ -1475,7 +1478,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27c';
+  var APP_BUILD = '2026-10-27d';
 
   function defaultState() {
     return {
@@ -2754,9 +2757,9 @@
   // --- Entry form ---
   function merchantTags(entry) {
     return sanitizeMerchants(entry.merchants).map(function(merchant) {
-      return '<span class="entry-tag merchant-tag" aria-label="' +
+      return '<span class="entry-tag merchant-tag ' + merchant + '-tag" aria-label="' +
         (merchant === 'amazon' ? 'Amazon' : 'eBay') + '">' +
-        (merchant === 'amazon' ? 'AMZN' : 'eBay') + '</span>';
+        (merchant === 'amazon' ? 'Amazon' : 'eBay') + '</span>';
     }).join('');
   }
 
