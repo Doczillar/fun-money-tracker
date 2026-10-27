@@ -1166,7 +1166,7 @@
       </div>
     </div>
     <div class="error-text" id="errorText">Enter an amount greater than $0.</div>
-    <button class="add-btn" id="addBtn">Add entry</button>
+    <button type="button" class="add-btn" id="addBtn">Add entry</button>
   </div>
 
   <div class="entries">
@@ -1478,7 +1478,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27d';
+  var APP_BUILD = '2026-10-27e';
 
   function defaultState() {
     return {
@@ -2920,7 +2920,19 @@
     if (fromKeyboard) input.focus();
   }
 
-  document.getElementById('addBtn').addEventListener('click', function() {
+  var addBtn = document.getElementById('addBtn');
+  function keepEntryFocus(ev) {
+    // A blur expands the compact balance card before iOS dispatches click,
+    // moving the button away from the finger and losing the activation.
+    // Keep focus through the tap; submit only on click so drags can cancel
+    // and a single tap cannot create two entries.
+    if (ev.type === 'pointerdown' && (!ev.isPrimary || ev.button !== 0)) return;
+    if (ev.type === 'mousedown' && ev.button !== 0) return;
+    ev.preventDefault();
+  }
+  addBtn.addEventListener('pointerdown', keepEntryFocus);
+  addBtn.addEventListener('mousedown', keepEntryFocus);
+  addBtn.addEventListener('click', function() {
     addEntry(false);
   });
 
