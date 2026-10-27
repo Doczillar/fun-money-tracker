@@ -59,6 +59,34 @@ test('updates ignore closed dialog values and preserve active work',()=>{
  let a=script.indexOf('      function hasUnsavedInput()'),b=script.indexOf('      var updateRegistration',a);vm.runInContext(script.slice(a,b),c);
  el('budgetInput').value='400.00';assert.equal(c.canApplyUpdateNow(),true);modal=true;assert.equal(c.canApplyUpdateNow(),false);modal=false;el('noteInput').value='draft';assert.equal(c.canApplyUpdateNow(),false);el('noteInput').value='';focused=true;assert.equal(c.canApplyUpdateNow(),false);focused=false;saveError=true;assert.equal(c.canApplyUpdateNow(),false);
 });
+test('calendar refresh updates labels without charges, and posts due charges once',()=>{
+ const {c}=env();let renders=0,saves=0;c.document.visibilityState='visible';c.subsOverlay={classList:{contains:()=>false}};c.render=()=>renders++;c.save=()=>saves++;
+ c.refreshCalendar();assert.equal(renders,1);assert.equal(saves,0);
+ c.state.subscriptions=[{...sub(),day:1}];c.refreshCalendar();c.refreshCalendar();assert.equal(c.state.entries.length,1);assert.equal(saves,1);
+ c.document.visibilityState='hidden';c.refreshCalendar();assert.equal(renders,3);
+ let delay;let callback;c.calendarTimer=null;c.clearTimeout=()=>{};c.setTimeout=(fn,ms)=>{callback=fn;delay=ms};c.scheduleCalendarRefresh();assert(delay>0&&delay<=86400100);assert.equal(typeof callback,'function');
+});
+test('next charge jumps match schedules, clamping and posted months',()=>{
+ const {c}=env();
+ for(const cadence of [1,2,5,12,1200]) for(const day of [1,28,31]) {
+   c.state.monthKey='2026-10';c.startOfToday=()=>new Date(2026,9,30);
+   for(const lastPostedKey of [null,'2026-10','2027-1']) {
+     const rule={...sub(),day,cadenceMonths:cadence,startMonthKey:'2025-1',lastPostedKey};
+     let expected=null,key=c.state.monthKey;
+     for(let i=0;i<cadence*2+24;i++,key=c.nextMonthKey(key)) {
+       const due=c.subscriptionDueDayStart(rule,key);
+       if(c.subscriptionChargesIn(rule,key)&&!c.alreadyPostedFor(rule,key)&&due>=c.startOfToday()){expected=due;break}
+     }
+     assert.equal(c.nextChargeDate(rule)?.getTime()??null,expected?.getTime()??null);
+   }
+ }
+ c.state.monthKey='2024-1';c.startOfToday=()=>new Date(2026,1,28);assert.equal(c.nextChargeDate({...sub(),startMonthKey:'2024-1'}).getTime(),new Date(2026,1,28).getTime());
+ assert.equal(c.nextChargeDate({...sub(),endMonthKey:'2025-12'}),null);
+ assert.equal(c.nextChargeDate({...sub(),canceledAt:1}),null);
+ c.rule={...sub(),startMonthKey:'2026-10',cadenceMonths:1000000000};c.state.monthKey='2026-11';
+ assert.equal(vm.runInContext('nextChargeDate(rule)',c,{timeout:100}),null);
+ assert.equal(c.nextChargeDate({...sub(),cadenceMonths:Number.MAX_VALUE}),null);
+});
 (async()=>{
  for(const status of [200,404,503]){
  let writes=0;const c={console,Request,Response,URL,Promise,setTimeout(){},self:{addEventListener(){},location:{origin:'https://example.com'}},fetch:async()=>({ok:status===200,status,type:'basic',clone:()=>new Response('network'),text:async()=>'network'}),caches:{open:async()=>({match:async()=>new Response('cached app'),put:async()=>writes++})}};
