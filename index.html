@@ -1501,7 +1501,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27h';
+  var APP_BUILD = '2026-10-27i';
 
   function defaultState() {
     return {
@@ -2809,17 +2809,29 @@
     });
   }
 
-  // Pointer selection must not transfer focus away from the entry field.
-  // Toggle on pointerdown for immediate feedback; native keyboard activation
-  // still uses the checkbox's normal click/change behavior.
+  // Cancel the native touch action itself on Safari. Preventing only
+  // pointerdown does not reliably stop iOS from focusing a checkbox.
   document.querySelectorAll('#entryMerchants .merchant-check').forEach(function(label) {
-    label.addEventListener('pointerdown', function(ev) {
-      if (!ev.isPrimary || ev.button !== 0) return;
-      ev.preventDefault();
+    function toggleMerchant() {
       var input = label.querySelector('input');
       setMerchantChoices('entryMerchants', input.checked ? [] : [input.getAttribute('data-merchant')]);
+    }
+    label.addEventListener('touchstart', function(ev) {
+      if (ev.touches.length !== 1) return;
+      ev.preventDefault(); // also suppresses the compatibility click
+      toggleMerchant();
+    }, { passive: false });
+    label.addEventListener('pointerdown', function(ev) {
+      if (ev.pointerType === 'touch' || !ev.isPrimary || ev.button !== 0) return;
+      ev.preventDefault();
+      toggleMerchant();
+    });
+    label.addEventListener('mousedown', function(ev) {
+      if (ev.button === 0) ev.preventDefault();
     });
     label.addEventListener('click', function(ev) {
+      // Pointer selection already happened above; keyboard/assistive clicks
+      // retain native checkbox behavior and the normal change handler.
       if (ev.detail > 0) ev.preventDefault();
     });
   });
@@ -2938,8 +2950,13 @@
 
     // Submitting via the keyboard means the user is likely entering several in
     // a row, so keep focus (and the keyboard) on the amount field. Tapping the
-    // button leaves focus alone so the keyboard doesn't pop up unexpectedly.
-    if (fromKeyboard) input.focus();
+    // button dismisses the keyboard after a successful add and reset.
+    if (fromKeyboard) {
+      input.focus();
+    } else {
+      var active = document.activeElement;
+      if (active === input || active === document.getElementById('noteInput')) active.blur();
+    }
   }
 
   var addBtn = document.getElementById('addBtn');
