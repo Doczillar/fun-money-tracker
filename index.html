@@ -1023,8 +1023,8 @@
   .entry-form .amount-input, .entry-form .note-input, .entry-form .type-toggle { height:44px; min-width:0; padding-top:0; padding-bottom:0; }
   .entry-form .note-input { font-size:16px; padding-left:10px; padding-right:6px; }
   .entry-form .entry-option-label { font-size:11px; line-height:14px; margin-bottom:0; }
-  #entryMerchants { justify-content:center; gap:8px; min-height:44px; flex-wrap:wrap; }
-  .merchant-check { display:flex; align-items:center; gap:4px; min-height:44px; font-size:13px; white-space:nowrap; cursor:pointer; }
+  #entryMerchants { flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:44px; flex-wrap:nowrap; }
+  .merchant-check { display:flex; align-items:center; gap:4px; min-height:20px; line-height:20px; font-size:13px; white-space:nowrap; cursor:pointer; }
   .merchant-check input { width:17px; height:17px; margin:0; accent-color:var(--gold); }
   .entry-form .add-btn { min-height:44px; padding:10px; }
   @media(max-width:480px) {
@@ -1475,7 +1475,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-26n';
+  var APP_BUILD = '2026-10-27a';
 
   function defaultState() {
     return {
