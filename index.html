@@ -1478,7 +1478,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27f';
+  var APP_BUILD = '2026-10-27g';
 
   function defaultState() {
     return {
@@ -2308,27 +2308,27 @@
     return Math.round((postedSubscriptionTotal() + reservedThisPeriod()) * 100) / 100;
   }
 
-  // The next date this subscription will post, or null if it has none left.
-  // How far ahead this needs to look depends on the cadence: a charge that
-  // lands every N months could be as much as N months past the current
-  // period (worst case: this period is itself a charging month but has
-  // already posted, so the next one is a full cycle away). N+1 iterations
-  // covers that with room to spare; for the common monthly case that's the
-  // same 2-period lookahead this always used.
+  // Jump directly to the next scheduled month, even for a large cadence or
+  // a budget period that lags behind today. At most two dates are examined.
   function nextChargeDate(sub) {
     if (!state.monthKey || sub.canceledAt) return null;
-    var today = startOfToday();
-    var key = state.monthKey;
     var cadence = sub.cadenceMonths || 1;
-
-    for (var i = 0; i < cadence + 1; i++) {
-      if (subscriptionChargesIn(sub, key) && !alreadyPostedFor(sub, key)) {
-        var dueDay = subscriptionDueDayStart(sub, key);
-        if (dueDay >= today) return dueDay;
-      }
-      key = nextMonthKey(key);
+    if (!Number.isSafeInteger(cadence) || cadence < 1) return null;
+    var today = startOfToday();
+    var start = monthKeyIndex(sub.startMonthKey);
+    var earliest = Math.max(monthKeyIndex(state.monthKey),
+      today.getFullYear() * 12 + today.getMonth(), start);
+    if (sub.lastPostedKey) earliest = Math.max(earliest, monthKeyIndex(sub.lastPostedKey) + 1);
+    var offset = Math.ceil((earliest - start) / cadence) * cadence;
+    var key = addMonthsToKey(sub.startMonthKey, offset);
+    var due = subscriptionDueDayStart(sub, key);
+    if (due < today) {
+      key = addMonthsToKey(sub.startMonthKey, offset + cadence);
+      due = subscriptionDueDayStart(sub, key);
     }
-    return null;
+    // Dates beyond the JavaScript calendar range cannot be displayed.
+    if (!Number.isFinite(due.getTime()) || !subscriptionChargesIn(sub, key)) return null;
+    return due;
   }
 
   function computeRemaining() {
@@ -4086,18 +4086,30 @@
     render();
   });
 
-  // The app lives on a home screen and can sit open for days, so a date change
-  // that happens while it is backgrounded still has to bring its charges in
-  // when the user comes back.
+  // Refresh calendar labels even when no subscriptions were posted. A page
+  // can stay alive across midnight, both on screen and in the background.
+  var calendarTimer;
+  function refreshCalendar() {
+    if (state.budget === null || document.visibilityState !== 'visible') return;
+    if (postDueSubscriptions()) save();
+    render();
+    if (subsOverlay.classList.contains('show')) renderSubsModal();
+  }
+  function scheduleCalendarRefresh() {
+    clearTimeout(calendarTimer);
+    var now = new Date();
+    var midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    calendarTimer = setTimeout(function() {
+      refreshCalendar();
+      scheduleCalendarRefresh();
+    }, midnight.getTime() - now.getTime() + 100);
+  }
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState !== 'visible') return;
-    if (state.budget === null) return;
-    if (postDueSubscriptions()) {
-      save();
-      render();
-      if (subsOverlay.classList.contains('show')) renderSubsModal();
-    }
+    refreshCalendar();
+    scheduleCalendarRefresh();
   });
+  scheduleCalendarRefresh();
 
   // --- Backup / restore ---
   // Three delivery paths, tried in order, because no single one works
