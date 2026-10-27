@@ -1042,6 +1042,22 @@
     .app:has(.entry-form input:focus) .ring-center { flex-direction:row; gap:8px; }
     .app:has(.entry-form input:focus) .ring-center .amount { font-size:24px; }
   }
+
+  /* Compact edit dialog: keep the complete form above the keyboard. */
+  #editOverlay { padding:8px; }
+  #editOverlay .modal { padding:12px; display:grid; gap:8px; }
+  #editOverlay .edit-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  #editOverlay h3 { padding:0; margin:0; font-size:17px; line-height:22px; }
+  #editOverlay #editSubtitle { margin:0; font-size:12px; line-height:16px; }
+  #editOverlay .edit-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  #editOverlay label { margin-bottom:3px; font-size:12px; line-height:16px; }
+  #editOverlay input { width:100%; min-width:0; height:40px; padding:6px 10px; margin:0; font-size:16px; }
+  #editOverlay .merchant-choices { margin:0; }
+  #editOverlay .merchant-choice { min-height:36px; padding:6px 10px; }
+  #editOverlay .modal-btn-row { margin:0; }
+  #editOverlay .btn { min-height:40px; padding:8px; }
+  #editOverlay .error-text { margin:4px 0 0; font-size:12px; }
+
 </style>
 </head>
 <body>
@@ -1166,7 +1182,7 @@
       </div>
     </div>
     <div class="error-text" id="errorText">Enter an amount greater than $0.</div>
-    <button class="add-btn" id="addBtn">Add entry</button>
+    <button type="button" class="add-btn" id="addBtn">Add entry</button>
   </div>
 
   <div class="entries">
@@ -1434,22 +1450,29 @@
 
 <div class="modal-overlay" id="editOverlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-    <h3 id="editTitle">Edit entry</h3>
-    <p id="editSubtitle"></p>
-    <label for="editDay" id="editDayLabel">Day</label>
-    <input class="note-input num" id="editDay" type="number" inputmode="numeric" min="1" step="1" style="margin-bottom:12px">
-    <div class="error-text" id="editDayError">Enter a valid day.</div>
-    <label for="editAmount">Amount</label>
-    <input class="amount-input" id="editAmount" type="text" inputmode="decimal" placeholder="$0.00" style="width:100%; margin-bottom:12px">
-    <div class="error-text" id="editError">Enter an amount greater than $0.</div>
-    <label for="editNote">Description</label>
-    <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40" style="margin-bottom:0">
-    <div class="edit-merchant-field">
-    <span class="entry-option-label" id="editMerchantLabel">Merchant · optional</span>
-    <div class="merchant-choices" id="editMerchants" role="group" aria-labelledby="editMerchantLabel">
+    <div class="edit-heading">
+      <h3 id="editTitle">Edit entry</h3>
+      <p id="editSubtitle"></p>
+    </div>
+    <div class="edit-fields">
+      <div>
+        <label for="editDay" id="editDayLabel">Day</label>
+        <input class="note-input num" id="editDay" type="number" inputmode="numeric" min="1" step="1">
+        <div class="error-text" id="editDayError">Enter a valid day.</div>
+      </div>
+      <div>
+        <label for="editAmount">Amount</label>
+        <input class="amount-input" id="editAmount" type="text" inputmode="decimal" placeholder="$0.00">
+        <div class="error-text" id="editError">Enter an amount greater than $0.</div>
+      </div>
+    </div>
+    <div>
+      <label for="editNote">Description</label>
+      <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40">
+    </div>
+    <div class="merchant-choices" id="editMerchants" role="group" aria-label="Merchant (optional)">
       <button type="button" class="merchant-choice" data-merchant="amazon" aria-pressed="false">Amazon</button>
       <button type="button" class="merchant-choice" data-merchant="ebay" aria-pressed="false">eBay</button>
-    </div>
     </div>
     <div class="modal-btn-row">
       <button class="btn btn-secondary" id="editCancel">Cancel</button>
@@ -1478,7 +1501,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27d';
+  var APP_BUILD = '2026-10-27h';
 
   function defaultState() {
     return {
@@ -1739,10 +1762,8 @@
         kind: 'rollover'
       });
       state.budget = state.baseBudget;
-      save();
     } else if (alreadyRecorded && Math.abs(adjustment) >= 0.005) {
       state.budget = state.baseBudget;
-      save();
     }
   }
 
@@ -1762,7 +1783,7 @@
         changed = true;
       }
     });
-    if (changed) save();
+    return changed;
   }
 
   function canUndoTransition() {
@@ -1781,7 +1802,7 @@
       // to load, and nothing of the user's to lose.
       return null;
     }
-    if (!raw) return null;
+    if (raw === null) return null;
 
     var parsed;
     try {
@@ -1794,7 +1815,9 @@
     }
     // Errors from here propagate deliberately, for the same reason: a bug in
     // sanitization must not look like "new user" and overwrite real data.
-    return sanitizeState(parsed);
+    var loaded = sanitizeState(parsed);
+    if (!loaded) throw new Error('Saved data is not a valid Fun Money state');
+    return loaded;
   }
 
   // --- Untrusted state normalization -------------------------------------
@@ -2176,7 +2199,7 @@
   // next time the app opened.
   //
   // Returns true when anything was posted, so callers know to save.
-  function postDueSubscriptions() {
+  function postDueSubscriptions(settlePeriod) {
     if (!state.monthKey || !state.subscriptions.length) return false;
 
     var today = startOfToday();
@@ -2185,7 +2208,7 @@
     state.subscriptions.forEach(function(sub) {
       if (!subscriptionChargesIn(sub, state.monthKey)) return;
       if (alreadyPostedFor(sub, state.monthKey)) return;
-      if (today < subscriptionDueDayStart(sub, state.monthKey)) return;
+      if (!settlePeriod && today < subscriptionDueDayStart(sub, state.monthKey)) return;
 
       var entry = {
         id: 'sub-' + sub.id + '-' + state.monthKey,
@@ -2269,9 +2292,8 @@
 
   // The same subscriptions reservedThisPeriod sums, but as a list rather
   // than a total - these are the ones a ghost card gets drawn for. Since
-  // postDueSubscriptions runs before every render, anything still in this
-  // list genuinely hasn't come due yet; it isn't a stale or overdue charge
-  // waiting on a boot that hasn't happened.
+  // Due charges are posted at launch and when returning to the app. This
+  // list contains the remaining scheduled charges for the open period.
   function upcomingSubscriptionsThisPeriod() {
     if (!state.monthKey) return [];
     var list = [];
@@ -2309,27 +2331,27 @@
     return Math.round((postedSubscriptionTotal() + reservedThisPeriod()) * 100) / 100;
   }
 
-  // The next date this subscription will post, or null if it has none left.
-  // How far ahead this needs to look depends on the cadence: a charge that
-  // lands every N months could be as much as N months past the current
-  // period (worst case: this period is itself a charging month but has
-  // already posted, so the next one is a full cycle away). N+1 iterations
-  // covers that with room to spare; for the common monthly case that's the
-  // same 2-period lookahead this always used.
+  // Jump directly to the next scheduled month, even for a large cadence or
+  // a budget period that lags behind today. At most two dates are examined.
   function nextChargeDate(sub) {
     if (!state.monthKey || sub.canceledAt) return null;
-    var today = startOfToday();
-    var key = state.monthKey;
     var cadence = sub.cadenceMonths || 1;
-
-    for (var i = 0; i < cadence + 1; i++) {
-      if (subscriptionChargesIn(sub, key) && !alreadyPostedFor(sub, key)) {
-        var dueDay = subscriptionDueDayStart(sub, key);
-        if (dueDay >= today) return dueDay;
-      }
-      key = nextMonthKey(key);
+    if (!Number.isSafeInteger(cadence) || cadence < 1) return null;
+    var today = startOfToday();
+    var start = monthKeyIndex(sub.startMonthKey);
+    var earliest = Math.max(monthKeyIndex(state.monthKey),
+      today.getFullYear() * 12 + today.getMonth(), start);
+    if (sub.lastPostedKey) earliest = Math.max(earliest, monthKeyIndex(sub.lastPostedKey) + 1);
+    var offset = Math.ceil((earliest - start) / cadence) * cadence;
+    var key = addMonthsToKey(sub.startMonthKey, offset);
+    var due = subscriptionDueDayStart(sub, key);
+    if (due < today) {
+      key = addMonthsToKey(sub.startMonthKey, offset + cadence);
+      due = subscriptionDueDayStart(sub, key);
     }
-    return null;
+    // Dates beyond the JavaScript calendar range cannot be displayed.
+    if (!Number.isFinite(due.getTime()) || !subscriptionChargesIn(sub, key)) return null;
+    return due;
   }
 
   function computeRemaining() {
@@ -2365,7 +2387,7 @@
     if (undoReady) {
       var undoTarget = monthKeyName(state.monthKey);
       document.getElementById('undoMonthBannerText').textContent =
-        undoTarget + ' started. You can undo until you add its first transaction.';
+        undoTarget + ' started. You can undo until you change transactions or subscriptions.';
     }
 
     var histLink = document.getElementById('historyLink');
@@ -2920,7 +2942,19 @@
     if (fromKeyboard) input.focus();
   }
 
-  document.getElementById('addBtn').addEventListener('click', function() {
+  var addBtn = document.getElementById('addBtn');
+  function keepEntryFocus(ev) {
+    // A blur expands the compact balance card before iOS dispatches click,
+    // moving the button away from the finger and losing the activation.
+    // Keep focus through the tap; submit only on click so drags can cancel
+    // and a single tap cannot create two entries.
+    if (ev.type === 'pointerdown' && (!ev.isPrimary || ev.button !== 0)) return;
+    if (ev.type === 'mousedown' && ev.button !== 0) return;
+    ev.preventDefault();
+  }
+  addBtn.addEventListener('pointerdown', keepEntryFocus);
+  addBtn.addEventListener('mousedown', keepEntryFocus);
+  addBtn.addEventListener('click', function() {
     addEntry(false);
   });
 
@@ -2966,7 +3000,7 @@
       help.textContent = 'You can still restore ' + monthKeyName(state.transitionUndo.sourceMonthKey) +
         ', or close ' + monthKeyName(state.monthKey) + ' to continue. Closing it commits the earlier change.';
     } else if (undoReady) {
-      help.textContent = 'No new transactions have been added yet, so you can restore ' +
+      help.textContent = 'Transactions and subscriptions are unchanged, so you can restore ' +
         monthKeyName(state.transitionUndo.sourceMonthKey) + '.';
     } else if (allowed) {
       var overdue = startOfToday() > periodEndDate(state.monthKey);
@@ -3041,7 +3075,7 @@
     freshChoice.setAttribute('aria-checked', rollOver === false ? 'true' : 'false');
 
     var targetName = monthKeyName(nextMonthKey(pendingSourceMonthKey));
-    var leftover = computeRemaining();
+    var leftover = computeRemaining() - reservedThisPeriod();
     var startingBalance = state.baseBudget + (rollOver ? leftover : 0);
     var confirmBtn = document.getElementById('confirmOk');
     confirmBtn.disabled = false;
@@ -3056,7 +3090,7 @@
     var targetKey = nextMonthKey(state.monthKey);
     var sourceName = monthKeyName(state.monthKey);
     var targetName = monthKeyName(targetKey);
-    var leftover = computeRemaining();
+    var leftover = computeRemaining() - reservedThisPeriod();
     var carryStart = Math.round((state.baseBudget + leftover) * 100) / 100;
 
     document.getElementById('confirmTitle').textContent =
@@ -3070,7 +3104,8 @@
     document.getElementById('freshStartChoiceDetail').textContent =
       targetName + ' starts at ' + fmt(state.baseBudget);
     document.getElementById('transitionTimingNote').textContent =
-      transitionTimingMessage(state.monthKey, targetKey);
+      transitionTimingMessage(state.monthKey, targetKey) +
+      ' Any remaining subscription charges for ' + sourceName + ' will be included when it closes.';
 
     var carryChoice = document.getElementById('carryOverChoice');
     var freshChoice = document.getElementById('freshStartChoice');
@@ -3135,7 +3170,7 @@
 
     var sourceKey = state.monthKey;
     var targetKey = nextMonthKey(sourceKey);
-    var leftover = computeRemaining();
+    var leftover = computeRemaining() - reservedThisPeriod();
     var rollOver = pendingRollOver;
     var previousState = {
       monthKey: state.monthKey,
@@ -3145,6 +3180,11 @@
       history: cloneData(state.history),
       subscriptions: cloneData(state.subscriptions)
     };
+
+    // Closing settles all scheduled charges, including dates still ahead.
+    // The undo snapshot above preserves the original unposted schedule.
+    postDueSubscriptions(true);
+    leftover = computeRemaining();
 
     // Appended, not replaced: the month being closed joins the previously
     // closed one, and the pair is trimmed to the two the app surfaces.
@@ -3211,38 +3251,15 @@
   var editNoteField = document.getElementById('editNote');
   var editingId = null;
 
-  // The overlay is position:fixed, so once the on-screen keyboard opens it
-  // still covers the whole layout viewport and the modal stays centred behind
-  // the keyboard. Pin the overlay to the visual viewport instead, then nudge
-  // the modal up or down so the amount field - not the modal - lands on the
-  // centre line of what's actually visible. Only runs while the amount field
-  // holds focus; the modal otherwise sits naturally centred.
+  // Center the whole dialog in the visual viewport, for every input.
+  // Centering the amount field alone can push Save behind the keyboard.
   function syncEditModalPosition() {
     if (!editOverlay.classList.contains('show')) return;
-
     var vv = window.visualViewport;
     editOverlay.style.top = (vv ? vv.offsetTop : 0) + 'px';
     editOverlay.style.height = (vv ? vv.height : window.innerHeight) + 'px';
     editOverlay.style.bottom = 'auto';
-
-    // Measured from layout geometry (offsetTop/offsetHeight) rather than
-    // getBoundingClientRect, so a transform mid-transition can't feed its own
-    // output back into the next calculation.
-    var contentHeight = editOverlay.clientHeight - 40; // 20px overlay padding each side
-    var modalHeight = editModal.offsetHeight;
-    var fieldCenter = editAmountField.offsetTop + editAmountField.offsetHeight / 2;
-
-    // Flexbox already centres the modal, so this is purely the gap between the
-    // modal's centre and the field's centre.
-    var shift = modalHeight / 2 - fieldCenter;
-
-    // Never shift so far that the modal loses more of itself off-screen than it
-    // already would from simply being taller than the space available.
-    var limit = Math.abs(contentHeight - modalHeight) / 2;
-    if (shift > limit) shift = limit;
-    if (shift < -limit) shift = -limit;
-
-    editOverlay.style.setProperty('--modal-shift', Math.round(shift) + 'px');
+    editOverlay.style.removeProperty('--modal-shift');
   }
 
   function resetEditModalPosition() {
@@ -3252,13 +3269,15 @@
     editOverlay.style.removeProperty('--modal-shift');
   }
 
-  // The keyboard is only up when the amount field is focused, so anything else
-  // means the modal belongs back in its natural centred position.
   function handleEditViewportChange() {
-    if (!editOverlay.classList.contains('show')) return;
-    if (document.activeElement === editAmountField) syncEditModalPosition();
-    else resetEditModalPosition();
+    syncEditModalPosition();
   }
+  [document.getElementById('editDay'), editNoteField].forEach(function(field) {
+    field.addEventListener('focus', handleEditViewportChange);
+  });
+  document.getElementById('editSave').addEventListener('pointerdown', function(ev) {
+    if (ev.isPrimary && ev.button === 0) ev.preventDefault();
+  });
 
   // Focus comes from the user tapping the field - the modal never grabs it.
   editAmountField.addEventListener('focus', function() {
@@ -3329,10 +3348,10 @@
     setMerchantChoices('editMerchants', entry.merchants);
     document.getElementById('editError').classList.remove('show');
 
-    // Opens with nothing focused, so the keyboard stays down until the user
-    // taps a field. Centring kicks in from the amount field's focus handler.
+    // Size to the visible viewport immediately, then track keyboard changes.
     resetEditModalPosition();
     editOverlay.classList.add('show');
+    syncEditModalPosition();
   }
 
   function closeEditModal() {
@@ -3387,6 +3406,7 @@
         e.ts = updatedDate.getTime();
       }
     });
+    state.transitionUndo = null;
     save();
     closeEditModal();
     render();
@@ -3430,6 +3450,7 @@
     state.entries = state.entries.filter(function(e) {
       return e.id !== id || isSystemRolloverEntry(e);
     });
+    state.transitionUndo = null;
     save();
     closeDeleteModal();
     render();
@@ -3927,6 +3948,7 @@
     }
 
     postDueSubscriptions();
+    state.transitionUndo = null;
     save();
     closeSubEditor();
 
@@ -4031,6 +4053,7 @@
     // Resuming is harmless and reversible, so it doesn't need a confirmation.
     if (sub.canceledAt) {
       resumeSubscription(sub);
+      state.transitionUndo = null;
       save();
       closeSubEditor();
       renderSubsModal();
@@ -4058,24 +4081,37 @@
       sub.canceledAt = Date.now();
     }
 
+    state.transitionUndo = null;
     save();
     closeSubEditor();
     renderSubsModal();
     render();
   });
 
-  // The app lives on a home screen and can sit open for days, so a date change
-  // that happens while it is backgrounded still has to bring its charges in
-  // when the user comes back.
+  // Refresh calendar labels even when no subscriptions were posted. A page
+  // can stay alive across midnight, both on screen and in the background.
+  var calendarTimer;
+  function refreshCalendar() {
+    if (state.budget === null || document.visibilityState !== 'visible') return;
+    if (postDueSubscriptions()) save();
+    render();
+    if (subsOverlay.classList.contains('show')) renderSubsModal();
+  }
+  function scheduleCalendarRefresh() {
+    clearTimeout(calendarTimer);
+    var now = new Date();
+    var midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    calendarTimer = setTimeout(function() {
+      refreshCalendar();
+      scheduleCalendarRefresh();
+    }, midnight.getTime() - now.getTime() + 100);
+  }
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState !== 'visible') return;
-    if (state.budget === null) return;
-    if (postDueSubscriptions()) {
-      save();
-      render();
-      if (subsOverlay.classList.contains('show')) renderSubsModal();
-    }
+    refreshCalendar();
+    scheduleCalendarRefresh();
   });
+  scheduleCalendarRefresh();
 
   // --- Backup / restore ---
   // Three delivery paths, tried in order, because no single one works
@@ -4360,7 +4396,9 @@
     }
 
     if (!save()) {
-      return 'The backup loaded but couldn\u2019t be saved on this device. Check your storage and try again.';
+      state = previous;
+      try { render(); } catch (ignored) {}
+      return 'The backup couldn\u2019t be saved. Your current data is unchanged. Check your storage and try again.';
     }
     return null;
   }
@@ -4681,29 +4719,49 @@
       var hadControllerAtLaunch = !!navigator.serviceWorker.controller;
 
       function hasUnsavedInput() {
-        var ids = ['amountInput', 'noteInput', 'budgetInput', 'editDay', 'editAmount', 'editNote',
-          'subNote', 'subAmount', 'subDay', 'subMonths'];
-        return ids.some(function(id) {
-          var el = document.getElementById(id);
-          return el && el.value && el.value.trim() !== '';
-        });
+        // Closed dialogs retain their saved values, not unfinished edits.
+        return ['amountInput', 'noteInput'].some(function(id) {
+          return document.getElementById(id).value.trim() !== '';
+        }) || selectedMerchants('entryMerchants').length > 0 || currentType !== 'spent';
       }
 
-      // This used to also require that the user hadn't interacted at all this
-      // session, which in practice meant anyone who opened the app and tapped
-      // something never received an update until a launch they didn't touch.
-      // What actually needs protecting is work in progress: half-typed input,
-      // or an open dialog. Reloading while someone reads their list is
-      // harmless, since everything on screen is already persisted.
       function canApplyUpdateNow() {
         return !hasUnsavedInput() &&
           document.visibilityState === 'visible' &&
-          !document.querySelector('.modal-overlay.show');
+          !document.querySelector('.modal-overlay.show') &&
+          !document.querySelector('#saveErrorBanner.show') &&
+          !document.querySelector('.entry-form input:focus');
       }
 
+      var updateRegistration = null;
+      var needsReload = false;
+      var updateTimer;
+      function applyReadyUpdate() {
+        if (!canApplyUpdateNow() || reloadStarted) return;
+        if (needsReload) {
+          reloadStarted = true;
+          window.location.reload();
+        } else if (updateRegistration && updateRegistration.waiting) {
+          updateRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+      function scheduleUpdateCheck() {
+        clearTimeout(updateTimer);
+        updateTimer = setTimeout(applyReadyUpdate, 200);
+      }
       function activateWaitingWorker(registration) {
-        if (!registration.waiting || !canApplyUpdateNow()) return;
-        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        updateRegistration = registration;
+        applyReadyUpdate();
+      }
+      // Retry after work is saved/canceled or focus leaves an empty composer.
+      ['input', 'change', 'click', 'focusout', 'visibilitychange'].forEach(function(type) {
+        document.addEventListener(type, scheduleUpdateCheck);
+      });
+      if (window.MutationObserver) {
+        var updateObserver = new MutationObserver(scheduleUpdateCheck);
+        document.querySelectorAll('.modal-overlay').forEach(function(el) {
+          updateObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+        });
       }
 
       navigator.serviceWorker.addEventListener('controllerchange', function() {
@@ -4713,10 +4771,8 @@
           hadControllerAtLaunch = true;
           return;
         }
-        if (reloadStarted || !canApplyUpdateNow()) return;
-
-        reloadStarted = true;
-        window.location.reload();
+        needsReload = true;
+        applyReadyUpdate();
       });
 
       window.addEventListener('load', function() {
@@ -4763,13 +4819,13 @@
     }
     if (!state.monthKey) {
       state.monthKey = currentMonthKey();
-      save();
     }
 
-    if (postDueSubscriptions()) save();
-    if (purgeStaleCanceledSubscriptions()) save();
+    postDueSubscriptions();
+    purgeStaleCanceledSubscriptions();
 
     render();
+    save();
   } catch (err) {
     showRecovery(err);
   }
@@ -4777,3 +4833,4 @@
 </script>
 </body>
 </html>
+
