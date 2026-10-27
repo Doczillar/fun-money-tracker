@@ -1042,6 +1042,22 @@
     .app:has(.entry-form input:focus) .ring-center { flex-direction:row; gap:8px; }
     .app:has(.entry-form input:focus) .ring-center .amount { font-size:24px; }
   }
+
+  /* Compact edit dialog: keep the complete form above the keyboard. */
+  #editOverlay { padding:8px; }
+  #editOverlay .modal { padding:12px; display:grid; gap:8px; }
+  #editOverlay .edit-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  #editOverlay h3 { padding:0; margin:0; font-size:17px; line-height:22px; }
+  #editOverlay #editSubtitle { margin:0; font-size:12px; line-height:16px; }
+  #editOverlay .edit-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  #editOverlay label { margin-bottom:3px; font-size:12px; line-height:16px; }
+  #editOverlay input { width:100%; min-width:0; height:40px; padding:6px 10px; margin:0; font-size:16px; }
+  #editOverlay .merchant-choices { margin:0; }
+  #editOverlay .merchant-choice { min-height:36px; padding:6px 10px; }
+  #editOverlay .modal-btn-row { margin:0; }
+  #editOverlay .btn { min-height:40px; padding:8px; }
+  #editOverlay .error-text { margin:4px 0 0; font-size:12px; }
+
 </style>
 </head>
 <body>
@@ -1434,22 +1450,29 @@
 
 <div class="modal-overlay" id="editOverlay">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-    <h3 id="editTitle">Edit entry</h3>
-    <p id="editSubtitle"></p>
-    <label for="editDay" id="editDayLabel">Day</label>
-    <input class="note-input num" id="editDay" type="number" inputmode="numeric" min="1" step="1" style="margin-bottom:12px">
-    <div class="error-text" id="editDayError">Enter a valid day.</div>
-    <label for="editAmount">Amount</label>
-    <input class="amount-input" id="editAmount" type="text" inputmode="decimal" placeholder="$0.00" style="width:100%; margin-bottom:12px">
-    <div class="error-text" id="editError">Enter an amount greater than $0.</div>
-    <label for="editNote">Description</label>
-    <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40" style="margin-bottom:0">
-    <div class="edit-merchant-field">
-    <span class="entry-option-label" id="editMerchantLabel">Merchant · optional</span>
-    <div class="merchant-choices" id="editMerchants" role="group" aria-labelledby="editMerchantLabel">
+    <div class="edit-heading">
+      <h3 id="editTitle">Edit entry</h3>
+      <p id="editSubtitle"></p>
+    </div>
+    <div class="edit-fields">
+      <div>
+        <label for="editDay" id="editDayLabel">Day</label>
+        <input class="note-input num" id="editDay" type="number" inputmode="numeric" min="1" step="1">
+        <div class="error-text" id="editDayError">Enter a valid day.</div>
+      </div>
+      <div>
+        <label for="editAmount">Amount</label>
+        <input class="amount-input" id="editAmount" type="text" inputmode="decimal" placeholder="$0.00">
+        <div class="error-text" id="editError">Enter an amount greater than $0.</div>
+      </div>
+    </div>
+    <div>
+      <label for="editNote">Description</label>
+      <input class="note-input" id="editNote" type="text" placeholder="What for? (optional)" maxlength="40">
+    </div>
+    <div class="merchant-choices" id="editMerchants" role="group" aria-label="Merchant (optional)">
       <button type="button" class="merchant-choice" data-merchant="amazon" aria-pressed="false">Amazon</button>
       <button type="button" class="merchant-choice" data-merchant="ebay" aria-pressed="false">eBay</button>
-    </div>
     </div>
     <div class="modal-btn-row">
       <button class="btn btn-secondary" id="editCancel">Cancel</button>
@@ -1478,7 +1501,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27g';
+  var APP_BUILD = '2026-10-27h';
 
   function defaultState() {
     return {
@@ -3228,38 +3251,15 @@
   var editNoteField = document.getElementById('editNote');
   var editingId = null;
 
-  // The overlay is position:fixed, so once the on-screen keyboard opens it
-  // still covers the whole layout viewport and the modal stays centred behind
-  // the keyboard. Pin the overlay to the visual viewport instead, then nudge
-  // the modal up or down so the amount field - not the modal - lands on the
-  // centre line of what's actually visible. Only runs while the amount field
-  // holds focus; the modal otherwise sits naturally centred.
+  // Center the whole dialog in the visual viewport, for every input.
+  // Centering the amount field alone can push Save behind the keyboard.
   function syncEditModalPosition() {
     if (!editOverlay.classList.contains('show')) return;
-
     var vv = window.visualViewport;
     editOverlay.style.top = (vv ? vv.offsetTop : 0) + 'px';
     editOverlay.style.height = (vv ? vv.height : window.innerHeight) + 'px';
     editOverlay.style.bottom = 'auto';
-
-    // Measured from layout geometry (offsetTop/offsetHeight) rather than
-    // getBoundingClientRect, so a transform mid-transition can't feed its own
-    // output back into the next calculation.
-    var contentHeight = editOverlay.clientHeight - 40; // 20px overlay padding each side
-    var modalHeight = editModal.offsetHeight;
-    var fieldCenter = editAmountField.offsetTop + editAmountField.offsetHeight / 2;
-
-    // Flexbox already centres the modal, so this is purely the gap between the
-    // modal's centre and the field's centre.
-    var shift = modalHeight / 2 - fieldCenter;
-
-    // Never shift so far that the modal loses more of itself off-screen than it
-    // already would from simply being taller than the space available.
-    var limit = Math.abs(contentHeight - modalHeight) / 2;
-    if (shift > limit) shift = limit;
-    if (shift < -limit) shift = -limit;
-
-    editOverlay.style.setProperty('--modal-shift', Math.round(shift) + 'px');
+    editOverlay.style.removeProperty('--modal-shift');
   }
 
   function resetEditModalPosition() {
@@ -3269,13 +3269,15 @@
     editOverlay.style.removeProperty('--modal-shift');
   }
 
-  // The keyboard is only up when the amount field is focused, so anything else
-  // means the modal belongs back in its natural centred position.
   function handleEditViewportChange() {
-    if (!editOverlay.classList.contains('show')) return;
-    if (document.activeElement === editAmountField) syncEditModalPosition();
-    else resetEditModalPosition();
+    syncEditModalPosition();
   }
+  [document.getElementById('editDay'), editNoteField].forEach(function(field) {
+    field.addEventListener('focus', handleEditViewportChange);
+  });
+  document.getElementById('editSave').addEventListener('pointerdown', function(ev) {
+    if (ev.isPrimary && ev.button === 0) ev.preventDefault();
+  });
 
   // Focus comes from the user tapping the field - the modal never grabs it.
   editAmountField.addEventListener('focus', function() {
@@ -3346,10 +3348,10 @@
     setMerchantChoices('editMerchants', entry.merchants);
     document.getElementById('editError').classList.remove('show');
 
-    // Opens with nothing focused, so the keyboard stays down until the user
-    // taps a field. Centring kicks in from the amount field's focus handler.
+    // Size to the visible viewport immediately, then track keyboard changes.
     resetEditModalPosition();
     editOverlay.classList.add('show');
+    syncEditModalPosition();
   }
 
   function closeEditModal() {
