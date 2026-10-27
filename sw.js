@@ -55,6 +55,7 @@ function networkFirstNavigation(event) {
   // Bypass the browser HTTP cache for the document itself. This is what makes
   // routine HTML deployments appear on the first normal online launch.
   var networkResponse = fetch(request, { cache: 'no-store' }).then(function(response) {
+    if (!response || !response.ok) throw new Error('Navigation request failed');
     if (!isCacheable(response)) return response;
 
     // Keep one canonical app-shell document for offline fallback. Waiting for
@@ -160,3 +161,4 @@ self.addEventListener('fetch', function(event) {
 
   event.respondWith(staleWhileRevalidate(event));
 });
+
