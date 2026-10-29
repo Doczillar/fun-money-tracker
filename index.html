@@ -463,7 +463,7 @@
     margin-left: 6px;
     vertical-align: 1px;
   }
-  .entry-tag.merchant-tag {
+  .entry-tag.merchant-tag, .entry-tag.subscription-tag {
     font-size: 9px;
     line-height: 12px;
     padding: 0 4px;
@@ -472,6 +472,7 @@
     letter-spacing: 0.02em;
   }
 
+  .entry-tag.subscription-tag { color:var(--muted); background:rgba(139, 149, 157, 0.16); }
   .entry-tag.ebay-tag { color:var(--coral); background:rgba(239, 119, 99, 0.14); }
 
   .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -1501,7 +1502,7 @@
   var STORAGE_KEY = 'funMoneyApp';
   // Shown at the bottom of Settings so you can confirm which build a device is
   // actually running before chasing a bug that a stale cache already fixed.
-  var APP_BUILD = '2026-10-27i';
+  var APP_BUILD = '2026-10-29b';
 
   function defaultState() {
     return {
@@ -2732,7 +2733,7 @@
           '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
           '<div class="entry-meta">' + timeStr + (systemRollover ? ' \u00b7 Rollover' : '') +
             chargeProgressText(e) +
-            (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') +
+            (isSubscriptionEntry(e) ? '<span class="entry-tag subscription-tag">Subscription</span>' : '') +
             merchantTags(e) + '</div>' +
         '</div>' +
         '<div class="entry-right">' +
@@ -3563,7 +3564,7 @@
             '<div class="entry-note">' + (e.note ? escapeHtml(e.note) : (e.type === 'added' ? 'Received' : 'Spent')) + '</div>' +
             '<div class="entry-meta">' + dateStr +
               chargeProgressText(e) +
-              (isSubscriptionEntry(e) ? '<span class="entry-tag">Subscription</span>' : '') +
+              (isSubscriptionEntry(e) ? '<span class="entry-tag subscription-tag">Subscription</span>' : '') +
               merchantTags(e) + '</div>' +
           '</div>' +
           '<div class="entry-right">' +
